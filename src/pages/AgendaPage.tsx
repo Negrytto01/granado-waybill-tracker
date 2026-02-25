@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getStatusClass, parseXML, formatDate, formatTime } from "@/lib/helpers";
+import { useRealtime } from "@/hooks/useRealtime";
+import { playTruckArrival } from "@/lib/sounds";
 import { Plus, Upload, Truck } from "lucide-react";
 
 const AgendaPage = () => {
@@ -15,12 +17,21 @@ const AgendaPage = () => {
   const [form, setForm] = useState({ numero_nf: "", fornecedor: "", cnpj: "", transportadora: "", placa: "", motorista: "", quantidade_volumes: 0, data_prevista: new Date().toISOString().split("T")[0] });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data } = await supabase.from("recebimentos").select("*").order("data_prevista", { ascending: true }).order("data_criacao", { ascending: false });
     setRecebimentos(data || []);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useRealtime("recebimentos", fetchData, {
+    onUpdate: (newRec: any) => {
+      if (newRec.status === "CHEGOU") {
+        playTruckArrival();
+        toast.info(`🚛 Caminhão chegou! NF ${newRec.numero_nf}`);
+      }
+    }
+  });
 
   const handleCreate = async () => {
     if (!form.numero_nf || !form.fornecedor) { toast.error("NF e Fornecedor obrigatórios"); return; }
@@ -34,7 +45,6 @@ const AgendaPage = () => {
     toast.success("Recebimento agendado!");
     setOpenNew(false);
     setForm({ numero_nf: "", fornecedor: "", cnpj: "", transportadora: "", placa: "", motorista: "", quantidade_volumes: 0, data_prevista: new Date().toISOString().split("T")[0] });
-    fetchData();
   };
 
   const handleXML = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,10 +53,11 @@ const AgendaPage = () => {
     const text = await file.text();
     try {
       const parsed = parseXML(text);
+      if (!parsed.numero_nf) { toast.error("NF não encontrada no XML"); return; }
       const totalItens = parsed.itens.reduce((a, b) => a + b.quantidade, 0);
       const { error } = await supabase.from("recebimentos").insert([{
         numero_nf: parsed.numero_nf,
-        fornecedor: parsed.fornecedor,
+        fornecedor: parsed.fornecedor || "Não identificado",
         cnpj: parsed.cnpj,
         quantidade_itens: Math.round(totalItens),
         xml_nota: text,
@@ -55,22 +66,22 @@ const AgendaPage = () => {
         data_prevista: new Date().toISOString().split("T")[0],
       }]);
       if (error) { toast.error(error.message); return; }
-      toast.success(`NF ${parsed.numero_nf} importada!`);
-      fetchData();
+      toast.success(`NF ${parsed.numero_nf} importada com sucesso!`);
     } catch {
-      toast.error("Erro ao processar XML");
+      toast.error("Erro ao processar XML. Verifique o arquivo.");
     }
     if (fileRef.current) fileRef.current.value = "";
   };
 
   const handleChegou = async (id: string) => {
-    await supabase.from("recebimentos").update({
+    const { error } = await supabase.from("recebimentos").update({
       status: "CHEGOU" as any,
       hora_chegada: new Date().toISOString(),
       usuario_responsavel: profile?.nome,
     }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    playTruckArrival();
     toast.success("Chegada registrada!");
-    fetchData();
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -107,7 +118,7 @@ const AgendaPage = () => {
                 <Input placeholder="Transportadora" value={form.transportadora} onChange={e => setForm({...form, transportadora: e.target.value})} className="bg-secondary" />
                 <Input placeholder="Placa" value={form.placa} onChange={e => setForm({...form, placa: e.target.value})} className="bg-secondary" />
                 <Input placeholder="Motorista" value={form.motorista} onChange={e => setForm({...form, motorista: e.target.value})} className="bg-secondary" />
-                <Input type="number" placeholder="Qtd Volumes" value={form.quantidade_volumes} onChange={e => setForm({...form, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
+                <Input type="number" placeholder="Qtd Volumes" value={form.quantidade_volumes || ""} onChange={e => setForm({...form, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
                 <Input type="date" value={form.data_prevista} onChange={e => setForm({...form, data_prevista: e.target.value})} className="bg-secondary" />
                 <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
               </div>

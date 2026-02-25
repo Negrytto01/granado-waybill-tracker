@@ -33,17 +33,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("usuarios")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-    setProfile(data as UsuarioProfile | null);
+    try {
+      const { data } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+      setProfile(data as UsuarioProfile | null);
+    } catch (e) {
+      console.error("Error fetching profile:", e);
+      setProfile(null);
+    }
   };
 
   useEffect(() => {
+    let mounted = true;
+
+    // Safety timeout - never stay loading forever
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn("Auth loading timeout - forcing load complete");
+        setLoading(false);
+      }
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!mounted) return;
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id);
@@ -55,14 +71,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
       }
       setLoading(false);
+    }).catch((err) => {
+      console.error("getSession error:", err);
+      if (mounted) setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (nome: string, senha: string) => {
@@ -78,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase.functions.invoke("create-user", {
       body: { nome, senha, cargo },
     });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message || "Erro ao criar usuário");
     if (data?.error) throw new Error(data.error);
   };
 

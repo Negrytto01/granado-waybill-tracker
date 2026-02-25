@@ -13,20 +13,21 @@ import ArmazenagemPage from "@/pages/ArmazenagemPage";
 import EtiquetasPage from "@/pages/EtiquetasPage";
 import HistoricoPage from "@/pages/HistoricoPage";
 import UsuariosPage from "@/pages/UsuariosPage";
+import RelatoriosPage from "@/pages/RelatoriosPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="neon-text font-heading text-2xl animate-pulse-neon">Carregando...</div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="neon-text font-heading text-2xl animate-pulse">Carregando...</div></div>;
   if (!user) return <Navigate to="/login" replace />;
   return <AppLayout>{children}</AppLayout>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="neon-text font-heading text-2xl animate-pulse">Carregando...</div></div>;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/etiquetas" element={<ProtectedRoute><EtiquetasPage /></ProtectedRoute>} />
             <Route path="/historico" element={<ProtectedRoute><HistoricoPage /></ProtectedRoute>} />
             <Route path="/usuarios" element={<ProtectedRoute><UsuariosPage /></ProtectedRoute>} />
+            <Route path="/relatorios" element={<ProtectedRoute><RelatoriosPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

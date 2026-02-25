@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatDateTime, getStatusClass } from "@/lib/helpers";
+import { useRealtime } from "@/hooks/useRealtime";
 import { History } from "lucide-react";
+import { useCallback } from "react";
 
 const HistoricoPage = () => {
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
@@ -14,17 +15,18 @@ const HistoricoPage = () => {
   const [filterUsuario, setFilterUsuario] = useState("");
   const [filterData, setFilterData] = useState("");
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      const [rec, etq] = await Promise.all([
-        supabase.from("recebimentos").select("*").order("data_criacao", { ascending: false }).limit(200),
-        supabase.from("etiquetas_pallet").select("*").order("data_criacao", { ascending: false }).limit(200),
-      ]);
-      setRecebimentos(rec.data || []);
-      setEtiquetas(etq.data || []);
-    };
-    fetchAll();
+  const fetchAll = useCallback(async () => {
+    const [rec, etq] = await Promise.all([
+      supabase.from("recebimentos").select("*").order("data_criacao", { ascending: false }).limit(200),
+      supabase.from("etiquetas_pallet").select("*").order("data_criacao", { ascending: false }).limit(200),
+    ]);
+    setRecebimentos(rec.data || []);
+    setEtiquetas(etq.data || []);
   }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useRealtime("recebimentos", fetchAll);
+  useRealtime("etiquetas_pallet", fetchAll);
 
   const filteredRec = recebimentos.filter(r => {
     if (filterNF && !r.numero_nf?.toLowerCase().includes(filterNF.toLowerCase())) return false;
