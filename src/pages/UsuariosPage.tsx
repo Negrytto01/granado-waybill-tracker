@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Users, Trash2 } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
+import { useRealtime } from "@/hooks/useRealtime";
 
 const cargos = ["Administrador", "Recebimento", "Conferente", "Estoque", "Fiscal"];
 
@@ -16,18 +17,21 @@ const UsuariosPage = () => {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({ nome: "", senha: "", confirmarSenha: "", cargo: "Recebimento" });
+  const [loading, setLoading] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data } = await supabase.from("usuarios").select("*").order("data_criacao", { ascending: false });
     setUsuarios(data || []);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useRealtime("usuarios", fetchData);
 
   const handleCreate = async () => {
     if (!form.nome || !form.senha) { toast.error("Preencha todos os campos"); return; }
     if (form.senha !== form.confirmarSenha) { toast.error("Senhas não conferem"); return; }
     if (form.senha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
+    setLoading(true);
     try {
       await signUp(form.nome, form.senha, form.cargo);
       toast.success("Usuário cadastrado!");
@@ -35,7 +39,9 @@ const UsuariosPage = () => {
       setForm({ nome: "", senha: "", confirmarSenha: "", cargo: "Recebimento" });
       fetchData();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || "Erro ao criar usuário");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,7 +76,9 @@ const UsuariosPage = () => {
                   {cargos.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Cadastrar</Button>
+              <Button onClick={handleCreate} disabled={loading} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
+                {loading ? "Cadastrando..." : "Cadastrar"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

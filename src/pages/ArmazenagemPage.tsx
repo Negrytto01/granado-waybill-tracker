@@ -1,46 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getStatusClass } from "@/lib/helpers";
+import { useRealtime } from "@/hooks/useRealtime";
 import { Package } from "lucide-react";
 
 const ArmazenagemPage = () => {
   const { profile } = useAuth();
   const [items, setItems] = useState<any[]>([]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data } = await supabase.from("armazenagem").select("*, recebimentos(numero_nf, fornecedor)")
       .in("status", ["AGUARDANDO ARMAZENAGEM", "EM ARMAZENAGEM"])
       .order("data_criacao", { ascending: true });
     setItems(data || []);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useRealtime("armazenagem", fetchData);
 
   const iniciarArmazenagem = async (id: string) => {
-    await supabase.from("armazenagem").update({
+    const { error } = await supabase.from("armazenagem").update({
       status: "EM ARMAZENAGEM" as any,
       hora_inicio: new Date().toISOString(),
       usuario_responsavel: profile?.nome,
     }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Armazenagem iniciada!");
-    fetchData();
   };
 
   const finalizarArmazenagem = async (item: any) => {
-    await supabase.from("armazenagem").update({
+    const { error: errArm } = await supabase.from("armazenagem").update({
       status: "FINALIZADO" as any,
       hora_fim: new Date().toISOString(),
     }).eq("id", item.id);
+    if (errArm) { toast.error(errArm.message); return; }
 
     await supabase.from("recebimentos").update({
       status: "FINALIZADO" as any,
     }).eq("id", item.recebimento_id);
 
     toast.success("Armazenagem finalizada!");
-    fetchData();
   };
 
   return (

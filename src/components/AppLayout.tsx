@@ -5,7 +5,7 @@ import ParticlesBackground from "@/components/ParticlesBackground";
 import Watermark from "@/components/Watermark";
 import logoGdr from "@/assets/logo-gdr.png";
 import {
-  LayoutDashboard, CalendarDays, Truck, Package, Tag, Users, History, LogOut, Menu, X
+  LayoutDashboard, CalendarDays, Truck, Package, Tag, Users, History, LogOut, Menu, X, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -16,6 +16,7 @@ const navItems = [
   { label: "Descarga", icon: Truck, path: "/descarga" },
   { label: "Armazenagem", icon: Package, path: "/armazenagem" },
   { label: "Etiquetas", icon: Tag, path: "/etiquetas" },
+  { label: "Relatórios", icon: BarChart3, path: "/relatorios" },
   { label: "Histórico", icon: History, path: "/historico" },
   { label: "Usuários", icon: Users, path: "/usuarios", adminOnly: true },
 ];

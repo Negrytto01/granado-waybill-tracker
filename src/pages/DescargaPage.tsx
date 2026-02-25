@@ -1,51 +1,64 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getStatusClass, formatTime, calcDuration } from "@/lib/helpers";
+import { useRealtime } from "@/hooks/useRealtime";
+import { playDescargaFinalizada } from "@/lib/sounds";
 import { Play, Square, Truck } from "lucide-react";
 
 const DescargaPage = () => {
   const { profile } = useAuth();
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data } = await supabase.from("recebimentos").select("*")
       .in("status", ["CHEGOU", "EM DESCARGA"])
       .order("hora_chegada", { ascending: true });
     setRecebimentos(data || []);
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); const i = setInterval(fetchData, 30000); return () => clearInterval(i); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useRealtime("recebimentos", fetchData);
+
+  // Auto-refresh timer for duration display
+  useEffect(() => {
+    const hasActive = recebimentos.some(r => r.status === "EM DESCARGA");
+    if (!hasActive) return;
+    const i = setInterval(() => setRecebimentos(prev => [...prev]), 10000);
+    return () => clearInterval(i);
+  }, [recebimentos]);
 
   const iniciarDescarga = async (id: string) => {
-    await supabase.from("recebimentos").update({
+    const { error } = await supabase.from("recebimentos").update({
       status: "EM DESCARGA" as any,
       hora_inicio_descarga: new Date().toISOString(),
       usuario_responsavel: profile?.nome,
     }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Descarga iniciada!");
-    fetchData();
   };
 
   const finalizarDescarga = async (r: any) => {
     const now = new Date().toISOString();
-    await supabase.from("recebimentos").update({
+    const { error: errRec } = await supabase.from("recebimentos").update({
       status: "AGUARDANDO ARMAZENAGEM" as any,
       hora_fim_descarga: now,
     }).eq("id", r.id);
+    if (errRec) { toast.error(errRec.message); return; }
 
-    await supabase.from("armazenagem").insert([{
+    const { error: errArm } = await supabase.from("armazenagem").insert([{
       recebimento_id: r.id,
       quantidade_itens: r.quantidade_itens || 0,
       quantidade_volumes: r.quantidade_volumes || 0,
       status: "AGUARDANDO ARMAZENAGEM" as any,
       usuario_responsavel: profile?.nome,
     }]);
+    if (errArm) { toast.error(errArm.message); return; }
 
+    playDescargaFinalizada();
     toast.success("Descarga finalizada! Enviado para armazenagem.");
-    fetchData();
   };
 
   return (

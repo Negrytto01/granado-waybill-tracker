@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Truck, Package, CalendarDays, CheckCircle, FileText, Tag, Users, History } from "lucide-react";
+import { useRealtime } from "@/hooks/useRealtime";
+import { Truck, Package, CalendarDays, CheckCircle, FileText, Tag, Users, History, BarChart3 } from "lucide-react";
 
 interface Stats {
   aguardando: number;
@@ -14,24 +15,25 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<Stats>({ aguardando: 0, emDescarga: 0, paraGuardar: 0, finalizadasHoje: 0 });
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      const today = new Date().toISOString().split("T")[0];
-      const [aguardando, emDescarga, paraGuardar, finalizadas] = await Promise.all([
-        supabase.from("recebimentos").select("id", { count: "exact", head: true }).in("status", ["AGENDADO", "CHEGOU"]),
-        supabase.from("recebimentos").select("id", { count: "exact", head: true }).eq("status", "EM DESCARGA"),
-        supabase.from("armazenagem").select("id", { count: "exact", head: true }).eq("status", "AGUARDANDO ARMAZENAGEM"),
-        supabase.from("recebimentos").select("id", { count: "exact", head: true }).eq("status", "DESCARGA FINALIZADA").gte("hora_fim_descarga", today),
-      ]);
-      setStats({
-        aguardando: aguardando.count || 0,
-        emDescarga: emDescarga.count || 0,
-        paraGuardar: paraGuardar.count || 0,
-        finalizadasHoje: finalizadas.count || 0,
-      });
-    };
-    fetchStats();
+  const fetchStats = useCallback(async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const [aguardando, emDescarga, paraGuardar, finalizadas] = await Promise.all([
+      supabase.from("recebimentos").select("id", { count: "exact", head: true }).in("status", ["AGENDADO", "CHEGOU"]),
+      supabase.from("recebimentos").select("id", { count: "exact", head: true }).eq("status", "EM DESCARGA"),
+      supabase.from("armazenagem").select("id", { count: "exact", head: true }).eq("status", "AGUARDANDO ARMAZENAGEM"),
+      supabase.from("recebimentos").select("id", { count: "exact", head: true }).eq("status", "FINALIZADO").gte("hora_fim_descarga", today),
+    ]);
+    setStats({
+      aguardando: aguardando.count || 0,
+      emDescarga: emDescarga.count || 0,
+      paraGuardar: paraGuardar.count || 0,
+      finalizadasHoje: finalizadas.count || 0,
+    });
   }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useRealtime("recebimentos", fetchStats);
+  useRealtime("armazenagem", fetchStats);
 
   const cards = [
     { label: "Aguardando", value: stats.aguardando, icon: Truck, color: "text-yellow-400" },
@@ -46,14 +48,14 @@ const DashboardPage = () => {
     { label: "Descarga", icon: Truck, path: "/descarga", color: "bg-orange-500/20 text-orange-400" },
     { label: "Armazenagem", icon: Package, path: "/armazenagem", color: "bg-purple-500/20 text-purple-400" },
     { label: "Etiqueta", icon: Tag, path: "/etiquetas", color: "bg-emerald-500/20 text-emerald-400" },
-    { label: "Histórico", icon: History, path: "/historico", color: "bg-info/20 text-info" },
+    { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-cyan-500/20 text-cyan-400" },
+    { label: "Histórico", icon: History, path: "/historico", color: "bg-blue-400/20 text-blue-300" },
   ];
 
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl neon-text">Dashboard</h1>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map(c => (
           <div key={c.label} className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 space-y-2">
@@ -66,10 +68,9 @@ const DashboardPage = () => {
         ))}
       </div>
 
-      {/* Quick actions */}
       <div>
         <h2 className="font-heading text-xl text-foreground mb-3">Acesso Rápido</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           {quickActions.map(a => (
             <button
               key={a.label}
