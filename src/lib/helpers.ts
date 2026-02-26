@@ -2,6 +2,8 @@ export const getStatusClass = (status: string): string => {
   const map: Record<string, string> = {
     'AGENDADO': 'status-agendado',
     'CHEGOU': 'status-chegou',
+    'ACOPLADO': 'status-em-descarga',
+    'DESACOPLADO': 'status-em-descarga',
     'EM DESCARGA': 'status-em-descarga',
     'DESCARGA FINALIZADA': 'status-descarga-finalizada',
     'AGUARDANDO ARMAZENAGEM': 'status-aguardando-armazenagem',

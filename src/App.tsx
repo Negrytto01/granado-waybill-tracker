@@ -10,10 +10,14 @@ import DashboardPage from "@/pages/DashboardPage";
 import AgendaPage from "@/pages/AgendaPage";
 import DescargaPage from "@/pages/DescargaPage";
 import ArmazenagemPage from "@/pages/ArmazenagemPage";
-import EtiquetasPage from "@/pages/EtiquetasPage";
 import HistoricoPage from "@/pages/HistoricoPage";
 import UsuariosPage from "@/pages/UsuariosPage";
 import RelatoriosPage from "@/pages/RelatoriosPage";
+import ValoresDescargaPage from "@/pages/ValoresDescargaPage";
+import ComprasPage from "@/pages/ComprasPage";
+import FornecedoresUrgenciaPage from "@/pages/FornecedoresUrgenciaPage";
+import FluxoFinanceiroPage from "@/pages/FluxoFinanceiroPage";
+import PermissoesPage from "@/pages/PermissoesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,10 +49,14 @@ const App = () => (
             <Route path="/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
             <Route path="/descarga" element={<ProtectedRoute><DescargaPage /></ProtectedRoute>} />
             <Route path="/armazenagem" element={<ProtectedRoute><ArmazenagemPage /></ProtectedRoute>} />
-            <Route path="/etiquetas" element={<ProtectedRoute><EtiquetasPage /></ProtectedRoute>} />
             <Route path="/historico" element={<ProtectedRoute><HistoricoPage /></ProtectedRoute>} />
             <Route path="/usuarios" element={<ProtectedRoute><UsuariosPage /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><RelatoriosPage /></ProtectedRoute>} />
+            <Route path="/valores" element={<ProtectedRoute><ValoresDescargaPage /></ProtectedRoute>} />
+            <Route path="/compras" element={<ProtectedRoute><ComprasPage /></ProtectedRoute>} />
+            <Route path="/fornecedores" element={<ProtectedRoute><FornecedoresUrgenciaPage /></ProtectedRoute>} />
+            <Route path="/financeiro" element={<ProtectedRoute><FluxoFinanceiroPage /></ProtectedRoute>} />
+            <Route path="/permissoes" element={<ProtectedRoute><PermissoesPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

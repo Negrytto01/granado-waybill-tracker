@@ -58,6 +58,30 @@ export type Database = {
           },
         ]
       }
+      cargo_permissoes: {
+        Row: {
+          ativo: boolean
+          cargo: string
+          data_criacao: string
+          id: string
+          pagina: string
+        }
+        Insert: {
+          ativo?: boolean
+          cargo: string
+          data_criacao?: string
+          id?: string
+          pagina: string
+        }
+        Update: {
+          ativo?: boolean
+          cargo?: string
+          data_criacao?: string
+          id?: string
+          pagina?: string
+        }
+        Relationships: []
+      }
       etiquetas_pallet: {
         Row: {
           data_criacao: string
@@ -88,62 +112,148 @@ export type Database = {
         }
         Relationships: []
       }
+      fluxo_financeiro: {
+        Row: {
+          criado_por: string | null
+          data_criacao: string
+          descricao: string
+          id: string
+          mes_referencia: string
+          recebimento_id: string | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          criado_por?: string | null
+          data_criacao?: string
+          descricao: string
+          id?: string
+          mes_referencia?: string
+          recebimento_id?: string | null
+          tipo: string
+          valor?: number
+        }
+        Update: {
+          criado_por?: string | null
+          data_criacao?: string
+          descricao?: string
+          id?: string
+          mes_referencia?: string
+          recebimento_id?: string | null
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fluxo_financeiro_recebimento_id_fkey"
+            columns: ["recebimento_id"]
+            isOneToOne: false
+            referencedRelation: "recebimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fornecedores_urgencia: {
+        Row: {
+          contagem_urgencias: number
+          data_criacao: string
+          id: string
+          nome_fornecedor: string
+          observacoes: string | null
+          ultima_urgencia: string
+        }
+        Insert: {
+          contagem_urgencias?: number
+          data_criacao?: string
+          id?: string
+          nome_fornecedor: string
+          observacoes?: string | null
+          ultima_urgencia?: string
+        }
+        Update: {
+          contagem_urgencias?: number
+          data_criacao?: string
+          id?: string
+          nome_fornecedor?: string
+          observacoes?: string | null
+          ultima_urgencia?: string
+        }
+        Relationships: []
+      }
       recebimentos: {
         Row: {
+          caixas_batidas: number | null
           cnpj: string | null
           data_criacao: string
           data_prevista: string | null
           fornecedor: string
+          hora_acoplagem: string | null
           hora_chegada: string | null
+          hora_desacoplagem: string | null
           hora_fim_descarga: string | null
           hora_inicio_descarga: string | null
+          horario_agenda: string | null
           id: string
           motorista: string | null
           numero_nf: string
+          pallets_descarregados: number | null
           placa: string | null
           quantidade_itens: number | null
           quantidade_volumes: number | null
           status: Database["public"]["Enums"]["recebimento_status"]
           transportadora: string | null
           usuario_responsavel: string | null
+          valor_cobrado: number | null
           xml_nota: string | null
         }
         Insert: {
+          caixas_batidas?: number | null
           cnpj?: string | null
           data_criacao?: string
           data_prevista?: string | null
           fornecedor: string
+          hora_acoplagem?: string | null
           hora_chegada?: string | null
+          hora_desacoplagem?: string | null
           hora_fim_descarga?: string | null
           hora_inicio_descarga?: string | null
+          horario_agenda?: string | null
           id?: string
           motorista?: string | null
           numero_nf: string
+          pallets_descarregados?: number | null
           placa?: string | null
           quantidade_itens?: number | null
           quantidade_volumes?: number | null
           status?: Database["public"]["Enums"]["recebimento_status"]
           transportadora?: string | null
           usuario_responsavel?: string | null
+          valor_cobrado?: number | null
           xml_nota?: string | null
         }
         Update: {
+          caixas_batidas?: number | null
           cnpj?: string | null
           data_criacao?: string
           data_prevista?: string | null
           fornecedor?: string
+          hora_acoplagem?: string | null
           hora_chegada?: string | null
+          hora_desacoplagem?: string | null
           hora_fim_descarga?: string | null
           hora_inicio_descarga?: string | null
+          horario_agenda?: string | null
           id?: string
           motorista?: string | null
           numero_nf?: string
+          pallets_descarregados?: number | null
           placa?: string | null
           quantidade_itens?: number | null
           quantidade_volumes?: number | null
           status?: Database["public"]["Enums"]["recebimento_status"]
           transportadora?: string | null
           usuario_responsavel?: string | null
+          valor_cobrado?: number | null
           xml_nota?: string | null
         }
         Relationships: []
@@ -172,6 +282,30 @@ export type Database = {
         }
         Relationships: []
       }
+      valores_descarga: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          id: string
+          valor_por_caixa: number
+          valor_por_pallet: number
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          id?: string
+          valor_por_caixa?: number
+          valor_por_pallet?: number
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          id?: string
+          valor_por_caixa?: number
+          valor_por_pallet?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -190,6 +324,9 @@ export type Database = {
         | "Conferente"
         | "Estoque"
         | "Fiscal"
+        | "Compras"
+        | "Financeiro"
+        | "Faturamento"
       recebimento_status:
         | "AGENDADO"
         | "CHEGOU"
@@ -197,6 +334,8 @@ export type Database = {
         | "DESCARGA FINALIZADA"
         | "AGUARDANDO ARMAZENAGEM"
         | "FINALIZADO"
+        | "ACOPLADO"
+        | "DESACOPLADO"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -335,6 +474,9 @@ export const Constants = {
         "Conferente",
         "Estoque",
         "Fiscal",
+        "Compras",
+        "Financeiro",
+        "Faturamento",
       ],
       recebimento_status: [
         "AGENDADO",
@@ -343,6 +485,8 @@ export const Constants = {
         "DESCARGA FINALIZADA",
         "AGUARDANDO ARMAZENAGEM",
         "FINALIZADO",
+        "ACOPLADO",
+        "DESACOPLADO",
       ],
     },
   },
