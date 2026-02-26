@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus, Users, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 
-const cargos = ["Administrador", "Recebimento", "Conferente", "Estoque", "Fiscal"];
+const cargos = ["Administrador", "Recebimento", "Conferente", "Estoque", "Fiscal", "Compras", "Financeiro", "Faturamento"];
 
 const UsuariosPage = () => {
   const { profile, signUp } = useAuth();
@@ -43,6 +43,14 @@ const UsuariosPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDelete = async (u: any) => {
+    if (!confirm(`Remover o usuário ${u.nome}?`)) return;
+    const { error } = await supabase.from("usuarios").delete().eq("id", u.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Usuário removido!");
+    fetchData();
   };
 
   if (profile?.cargo !== "Administrador") {
@@ -91,6 +99,9 @@ const UsuariosPage = () => {
               <p className="font-heading text-foreground">{u.nome}</p>
               <p className="text-xs text-muted-foreground">{u.cargo} · {formatDateTime(u.data_criacao)}</p>
             </div>
+            <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} className="text-destructive hover:text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         ))}
         {usuarios.length === 0 && (

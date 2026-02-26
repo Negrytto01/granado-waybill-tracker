@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useRealtime } from "@/hooks/useRealtime";
-import { Truck, Package, CalendarDays, CheckCircle, FileText, Tag, Users, History, BarChart3 } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Truck, Package, CalendarDays, CheckCircle, FileText, Users, History, BarChart3, ShoppingCart, AlertTriangle, Wallet, DollarSign } from "lucide-react";
 
 interface Stats {
   aguardando: number;
@@ -13,13 +14,14 @@ interface Stats {
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const { hasAccess } = usePermissions();
   const [stats, setStats] = useState<Stats>({ aguardando: 0, emDescarga: 0, paraGuardar: 0, finalizadasHoje: 0 });
 
   const fetchStats = useCallback(async () => {
     const today = new Date().toISOString().split("T")[0];
     const [aguardando, emDescarga, paraGuardar, finalizadas] = await Promise.all([
       supabase.from("recebimentos").select("id", { count: "exact", head: true }).in("status", ["AGENDADO", "CHEGOU"]),
-      supabase.from("recebimentos").select("id", { count: "exact", head: true }).eq("status", "EM DESCARGA"),
+      supabase.from("recebimentos").select("id", { count: "exact", head: true }).in("status", ["EM DESCARGA", "ACOPLADO", "DESACOPLADO"]),
       supabase.from("armazenagem").select("id", { count: "exact", head: true }).eq("status", "AGUARDANDO ARMAZENAGEM"),
       supabase.from("recebimentos").select("id", { count: "exact", head: true }).eq("status", "FINALIZADO").gte("hora_fim_descarga", today),
     ]);
@@ -42,15 +44,20 @@ const DashboardPage = () => {
     { label: "Finalizadas Hoje", value: stats.finalizadasHoje, icon: CheckCircle, color: "text-emerald-400" },
   ];
 
-  const quickActions = [
-    { label: "Nova NF", icon: FileText, path: "/agenda", color: "bg-primary/20 text-primary" },
-    { label: "Agenda", icon: CalendarDays, path: "/agenda", color: "bg-blue-500/20 text-blue-400" },
-    { label: "Descarga", icon: Truck, path: "/descarga", color: "bg-orange-500/20 text-orange-400" },
-    { label: "Armazenagem", icon: Package, path: "/armazenagem", color: "bg-purple-500/20 text-purple-400" },
-    { label: "Etiqueta", icon: Tag, path: "/etiquetas", color: "bg-emerald-500/20 text-emerald-400" },
-    { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-cyan-500/20 text-cyan-400" },
-    { label: "Histórico", icon: History, path: "/historico", color: "bg-blue-400/20 text-blue-300" },
+  const allQuickActions = [
+    { label: "Agenda", icon: CalendarDays, path: "/agenda", page: "agenda", color: "bg-blue-500/20 text-blue-400" },
+    { label: "Descarga", icon: Truck, path: "/descarga", page: "descarga", color: "bg-orange-500/20 text-orange-400" },
+    { label: "Armazenagem", icon: Package, path: "/armazenagem", page: "armazenagem", color: "bg-purple-500/20 text-purple-400" },
+    { label: "Compras", icon: ShoppingCart, path: "/compras", page: "compras", color: "bg-teal-500/20 text-teal-400" },
+    { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios", color: "bg-cyan-500/20 text-cyan-400" },
+    { label: "Histórico", icon: History, path: "/historico", page: "historico", color: "bg-blue-400/20 text-blue-300" },
+    { label: "Fornecedores", icon: AlertTriangle, path: "/fornecedores", page: "fornecedores", color: "bg-red-500/20 text-red-400" },
+    { label: "Valores", icon: DollarSign, path: "/valores", page: "valores", color: "bg-amber-500/20 text-amber-400" },
+    { label: "Financeiro", icon: Wallet, path: "/financeiro", page: "financeiro", color: "bg-green-500/20 text-green-400" },
+    { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios", color: "bg-slate-500/20 text-slate-400" },
   ];
+
+  const quickActions = allQuickActions.filter(a => hasAccess(a.page));
 
   return (
     <div className="space-y-6">
@@ -70,7 +77,7 @@ const DashboardPage = () => {
 
       <div>
         <h2 className="font-heading text-xl text-foreground mb-3">Acesso Rápido</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {quickActions.map(a => (
             <button
               key={a.label}

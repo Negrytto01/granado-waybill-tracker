@@ -1,42 +1,49 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useNavigate, useLocation } from "react-router-dom";
 import ParticlesBackground from "@/components/ParticlesBackground";
 import Watermark from "@/components/Watermark";
 import logoGdr from "@/assets/logo-gdr.png";
 import {
-  LayoutDashboard, CalendarDays, Truck, Package, Tag, Users, History, LogOut, Menu, X, BarChart3
+  LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
+  DollarSign, ShoppingCart, AlertTriangle, Wallet, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { label: "Agenda", icon: CalendarDays, path: "/agenda" },
-  { label: "Descarga", icon: Truck, path: "/descarga" },
-  { label: "Armazenagem", icon: Package, path: "/armazenagem" },
-  { label: "Etiquetas", icon: Tag, path: "/etiquetas" },
-  { label: "Relatórios", icon: BarChart3, path: "/relatorios" },
-  { label: "Histórico", icon: History, path: "/historico" },
-  { label: "Usuários", icon: Users, path: "/usuarios", adminOnly: true },
+const allNavItems = [
+  { label: "Dashboard", icon: LayoutDashboard, path: "/", page: "dashboard" },
+  { label: "Agenda", icon: CalendarDays, path: "/agenda", page: "agenda" },
+  { label: "Descarga", icon: Truck, path: "/descarga", page: "descarga" },
+  { label: "Armazenagem", icon: Package, path: "/armazenagem", page: "armazenagem" },
+  { label: "Compras", icon: ShoppingCart, path: "/compras", page: "compras" },
+  { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios" },
+  { label: "Histórico", icon: History, path: "/historico", page: "historico" },
+  { label: "Fornecedores", icon: AlertTriangle, path: "/fornecedores", page: "fornecedores" },
+  { label: "Valores", icon: DollarSign, path: "/valores", page: "valores" },
+  { label: "Financeiro", icon: Wallet, path: "/financeiro", page: "financeiro" },
+  { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
+  { label: "Permissões", icon: Shield, path: "/permissoes", page: "usuarios" }, // admin only
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const { profile, signOut } = useAuth();
+  const { hasAccess, isAdmin } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isAdmin = profile?.cargo === "Administrador";
-
-  const filteredNav = navItems.filter(item => !item.adminOnly || isAdmin);
+  const filteredNav = allNavItems.filter(item => {
+    if (item.path === "/permissoes") return isAdmin;
+    return hasAccess(item.page);
+  });
 
   return (
     <div className="min-h-screen bg-background relative">
       <ParticlesBackground />
       <Watermark />
 
-      {/* Top bar */}
       <header className="sticky top-0 z-50 h-14 border-b border-border bg-card/90 backdrop-blur-md flex items-center px-4 gap-3">
         <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden text-foreground">
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
@@ -54,7 +61,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       </header>
 
       <div className="flex">
-        {/* Sidebar - desktop */}
         <aside className="hidden lg:flex flex-col w-56 min-h-[calc(100vh-3.5rem)] border-r border-border bg-card/50 backdrop-blur-sm p-3 gap-1 relative z-10">
           {filteredNav.map(item => {
             const active = location.pathname === item.path;
@@ -63,9 +69,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  active
-                    ? "bg-primary/15 text-primary neon-border"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  active ? "bg-primary/15 text-primary neon-border" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 }`}
               >
                 <item.icon size={18} />
@@ -75,7 +79,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           })}
         </aside>
 
-        {/* Mobile nav */}
         {mobileOpen && (
           <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileOpen(false)}>
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
@@ -87,9 +90,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                     key={item.path}
                     onClick={() => { navigate(item.path); setMobileOpen(false); }}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all w-full ${
-                      active
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                     }`}
                   >
                     <item.icon size={18} />
@@ -101,7 +102,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           </div>
         )}
 
-        {/* Main */}
         <main className="flex-1 relative z-10 p-4 md:p-6 overflow-auto min-h-[calc(100vh-3.5rem)]">
           {children}
         </main>
