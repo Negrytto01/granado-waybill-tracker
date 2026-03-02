@@ -18,6 +18,7 @@ import ComprasPage from "@/pages/ComprasPage";
 import FornecedoresUrgenciaPage from "@/pages/FornecedoresUrgenciaPage";
 import FluxoFinanceiroPage from "@/pages/FluxoFinanceiroPage";
 import PermissoesPage from "@/pages/PermissoesPage";
+import CalendarioPage from "@/pages/CalendarioPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/fornecedores" element={<ProtectedRoute><FornecedoresUrgenciaPage /></ProtectedRoute>} />
             <Route path="/financeiro" element={<ProtectedRoute><FluxoFinanceiroPage /></ProtectedRoute>} />
             <Route path="/permissoes" element={<ProtectedRoute><PermissoesPage /></ProtectedRoute>} />
+            <Route path="/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Shield, Users } from "lucide-react";
+import { Shield } from "lucide-react";
 
 const allPages = [
   { key: "dashboard", label: "Dashboard" },
@@ -17,6 +17,7 @@ const allPages = [
   { key: "financeiro", label: "Financeiro" },
   { key: "valores", label: "Valores Descarga" },
   { key: "usuarios", label: "Usuários" },
+  { key: "calendario", label: "Calendário" },
 ];
 
 const cargos = ["Recebimento", "Conferente", "Estoque", "Fiscal", "Compras", "Financeiro", "Faturamento"];
@@ -36,7 +37,6 @@ const PermissoesPage = () => {
 
   const togglePermission = async (cargo: string, pagina: string, currentAtivo: boolean | undefined) => {
     const existing = permissoes.find(p => p.cargo === cargo && p.pagina === pagina);
-    
     if (existing) {
       await supabase.from("cargo_permissoes").update({ ativo: !currentAtivo }).eq("id", existing.id);
     } else {
@@ -54,7 +54,6 @@ const PermissoesPage = () => {
   if (profile?.cargo !== "Administrador") {
     return <div className="text-center py-12 text-muted-foreground">Acesso restrito a administradores</div>;
   }
-
   if (loading) return <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>;
 
   return (
@@ -70,9 +69,7 @@ const PermissoesPage = () => {
           <thead>
             <tr className="border-b border-border">
               <th className="text-left p-3 text-muted-foreground text-sm font-medium">Tela</th>
-              {cargos.map(c => (
-                <th key={c} className="text-center p-3 text-muted-foreground text-sm font-medium">{c}</th>
-              ))}
+              {cargos.map(c => <th key={c} className="text-center p-3 text-muted-foreground text-sm font-medium">{c}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -81,10 +78,7 @@ const PermissoesPage = () => {
                 <td className="p-3 text-foreground font-medium">{page.label}</td>
                 {cargos.map(cargo => (
                   <td key={cargo} className="text-center p-3">
-                    <Switch
-                      checked={isActive(cargo, page.key)}
-                      onCheckedChange={() => togglePermission(cargo, page.key, isActive(cargo, page.key))}
-                    />
+                    <Switch checked={isActive(cargo, page.key)} onCheckedChange={() => togglePermission(cargo, page.key, isActive(cargo, page.key))} />
                   </td>
                 ))}
               </tr>

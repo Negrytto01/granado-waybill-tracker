@@ -10,10 +10,9 @@ const ValoresDescargaPage = () => {
   const { profile } = useAuth();
   const [valorCaixa, setValorCaixa] = useState("");
   const [valorPallet, setValorPallet] = useState("");
+  const [valorTonelada, setValorTonelada] = useState("");
   const [loading, setLoading] = useState(true);
   const [existingId, setExistingId] = useState<string | null>(null);
-
-  // Recent recebimentos with valor_cobrado
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -21,6 +20,7 @@ const ValoresDescargaPage = () => {
     if (valores && valores.length > 0) {
       setValorCaixa(String(valores[0].valor_por_caixa));
       setValorPallet(String(valores[0].valor_por_pallet));
+      setValorTonelada(String(valores[0].valor_por_tonelada || 0));
       setExistingId(valores[0].id);
     }
 
@@ -37,20 +37,17 @@ const ValoresDescargaPage = () => {
   const handleSave = async () => {
     const caixa = parseFloat(valorCaixa) || 0;
     const pallet = parseFloat(valorPallet) || 0;
+    const tonelada = parseFloat(valorTonelada) || 0;
 
     if (existingId) {
       const { error } = await supabase.from("valores_descarga").update({
-        valor_por_caixa: caixa,
-        valor_por_pallet: pallet,
-        atualizado_em: new Date().toISOString(),
-        atualizado_por: profile?.nome,
+        valor_por_caixa: caixa, valor_por_pallet: pallet, valor_por_tonelada: tonelada,
+        atualizado_em: new Date().toISOString(), atualizado_por: profile?.nome,
       }).eq("id", existingId);
       if (error) { toast.error(error.message); return; }
     } else {
       const { error } = await supabase.from("valores_descarga").insert([{
-        valor_por_caixa: caixa,
-        valor_por_pallet: pallet,
-        atualizado_por: profile?.nome,
+        valor_por_caixa: caixa, valor_por_pallet: pallet, valor_por_tonelada: tonelada, atualizado_por: profile?.nome,
       }]);
       if (error) { toast.error(error.message); return; }
     }
@@ -61,13 +58,11 @@ const ValoresDescargaPage = () => {
   if (profile?.cargo !== "Administrador") {
     return <div className="text-center py-12 text-muted-foreground">Acesso restrito a administradores</div>;
   }
-
   if (loading) return <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>;
 
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl neon-text">Valores de Descarga</h1>
-
       <div className="max-w-md p-6 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-4">
         <div>
           <label className="text-sm text-muted-foreground">Valor por Caixa Batida (R$)</label>
@@ -76,6 +71,10 @@ const ValoresDescargaPage = () => {
         <div>
           <label className="text-sm text-muted-foreground">Valor por Pallet Descarregado (R$)</label>
           <Input type="number" step="0.01" value={valorPallet} onChange={e => setValorPallet(e.target.value)} className="bg-secondary mt-1" />
+        </div>
+        <div>
+          <label className="text-sm text-muted-foreground">Valor por Tonelada (R$)</label>
+          <Input type="number" step="0.01" value={valorTonelada} onChange={e => setValorTonelada(e.target.value)} className="bg-secondary mt-1" />
         </div>
         <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
           <DollarSign className="mr-2 h-4 w-4" /> Salvar Valores
@@ -97,6 +96,7 @@ const ValoresDescargaPage = () => {
                   {r.caixas_batidas > 0 && `${r.caixas_batidas} caixas`}
                   {r.caixas_batidas > 0 && r.pallets_descarregados > 0 && " · "}
                   {r.pallets_descarregados > 0 && `${r.pallets_descarregados} pallets`}
+                  {r.toneladas > 0 && ` · ${r.toneladas}t`}
                 </p>
               </div>
             </div>

@@ -8,14 +8,24 @@ import { toast } from "sonner";
 import { getStatusClass, parseXML, formatDate, formatTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Upload, Truck, Trash2, Edit } from "lucide-react";
+import { Plus, Upload, Truck, Trash2, Edit, X } from "lucide-react";
+
+interface NFEntry {
+  numero_nf: string;
+  quantidade_volumes: number;
+}
 
 const AgendaPage = () => {
   const { profile } = useAuth();
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
-  const [form, setForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: new Date().toISOString().split("T")[0], horario_agenda: "" });
+  const [fornecedor, setFornecedor] = useState("");
+  const [dataPrevista, setDataPrevista] = useState(new Date().toISOString().split("T")[0]);
+  const [horarioAgenda, setHorarioAgenda] = useState("");
+  const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0 }]);
+  // Single NF fields for edit mode
+  const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "" });
   const fileRef = useRef<HTMLInputElement>(null);
   const isAdmin = profile?.cargo === "Administrador";
 
@@ -35,21 +45,38 @@ const AgendaPage = () => {
     }
   });
 
-  const resetForm = () => setForm({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: new Date().toISOString().split("T")[0], horario_agenda: "" });
+  const resetForm = () => {
+    setFornecedor("");
+    setDataPrevista(new Date().toISOString().split("T")[0]);
+    setHorarioAgenda("");
+    setNfEntries([{ numero_nf: "", quantidade_volumes: 0 }]);
+  };
+
+  const addNfEntry = () => setNfEntries([...nfEntries, { numero_nf: "", quantidade_volumes: 0 }]);
+  const removeNfEntry = (i: number) => setNfEntries(nfEntries.filter((_, idx) => idx !== i));
+  const updateNfEntry = (i: number, field: keyof NFEntry, value: string | number) => {
+    const updated = [...nfEntries];
+    (updated[i] as any)[field] = value;
+    setNfEntries(updated);
+  };
 
   const handleCreate = async () => {
-    if (!form.numero_nf || !form.fornecedor) { toast.error("NF e Fornecedor obrigatórios"); return; }
-    const { error } = await supabase.from("recebimentos").insert([{
-      numero_nf: form.numero_nf,
-      fornecedor: form.fornecedor,
-      quantidade_volumes: Number(form.quantidade_volumes),
-      data_prevista: form.data_prevista,
-      horario_agenda: form.horario_agenda || null,
+    const validNFs = nfEntries.filter(nf => nf.numero_nf.trim());
+    if (validNFs.length === 0 || !fornecedor) { toast.error("NF e Fornecedor obrigatórios"); return; }
+
+    const inserts = validNFs.map(nf => ({
+      numero_nf: nf.numero_nf,
+      fornecedor,
+      quantidade_volumes: Number(nf.quantidade_volumes),
+      data_prevista: dataPrevista,
+      horario_agenda: horarioAgenda || null,
       usuario_responsavel: profile?.nome,
       status: "AGENDADO" as any,
-    }]);
+    }));
+
+    const { error } = await supabase.from("recebimentos").insert(inserts);
     if (error) { toast.error(error.message); return; }
-    toast.success("Recebimento agendado!");
+    toast.success(`${validNFs.length} NF(s) agendada(s)!`);
     setOpenNew(false);
     resetForm();
   };
@@ -57,16 +84,15 @@ const AgendaPage = () => {
   const handleEdit = async () => {
     if (!editItem) return;
     const { error } = await supabase.from("recebimentos").update({
-      numero_nf: form.numero_nf,
-      fornecedor: form.fornecedor,
-      quantidade_volumes: Number(form.quantidade_volumes),
-      data_prevista: form.data_prevista,
-      horario_agenda: form.horario_agenda || null,
+      numero_nf: editForm.numero_nf,
+      fornecedor: editForm.fornecedor,
+      quantidade_volumes: Number(editForm.quantidade_volumes),
+      data_prevista: editForm.data_prevista,
+      horario_agenda: editForm.horario_agenda || null,
     }).eq("id", editItem.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Atualizado!");
     setEditItem(null);
-    resetForm();
   };
 
   const handleDelete = async (id: string) => {
@@ -77,7 +103,7 @@ const AgendaPage = () => {
   };
 
   const openEdit = (r: any) => {
-    setForm({
+    setEditForm({
       numero_nf: r.numero_nf,
       fornecedor: r.fornecedor,
       quantidade_volumes: r.quantidade_volumes || 0,
@@ -114,12 +140,11 @@ const AgendaPage = () => {
   };
 
   const handleChegou = async (id: string) => {
-    const { error } = await supabase.from("recebimentos").update({
+    await supabase.from("recebimentos").update({
       status: "CHEGOU" as any,
       hora_chegada: new Date().toISOString(),
       usuario_responsavel: profile?.nome,
     }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
     playTruckArrival();
     toast.success("Chegada registrada!");
   };
@@ -133,22 +158,6 @@ const AgendaPage = () => {
     { label: "Amanhã", items: recebimentos.filter(r => r.data_prevista === tomorrow) },
     { label: "Próximos", items: recebimentos.filter(r => r.data_prevista > tomorrow) },
   ];
-
-  const formFields = (
-    <div className="space-y-3">
-      <Input placeholder="Número NF *" value={form.numero_nf} onChange={e => setForm({...form, numero_nf: e.target.value})} className="bg-secondary" />
-      <Input placeholder="Fornecedor *" value={form.fornecedor} onChange={e => setForm({...form, fornecedor: e.target.value})} className="bg-secondary" />
-      <Input type="number" placeholder="Qtd Volumes (Caixas)" value={form.quantidade_volumes || ""} onChange={e => setForm({...form, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
-      <div>
-        <label className="text-xs text-muted-foreground">Data da Agenda</label>
-        <Input type="date" value={form.data_prevista} onChange={e => setForm({...form, data_prevista: e.target.value})} className="bg-secondary mt-1" />
-      </div>
-      <div>
-        <label className="text-xs text-muted-foreground">Horário da Agenda</label>
-        <Input type="time" value={form.horario_agenda} onChange={e => setForm({...form, horario_agenda: e.target.value})} className="bg-secondary mt-1" />
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -165,21 +174,66 @@ const AgendaPage = () => {
                 <Plus className="mr-2 h-4 w-4" /> Nova NF
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border">
+            <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle className="font-heading neon-text">Novo Recebimento</DialogTitle></DialogHeader>
-              {formFields}
-              <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
+              <div className="space-y-3">
+                <Input placeholder="Fornecedor *" value={fornecedor} onChange={e => setFornecedor(e.target.value)} className="bg-secondary" />
+                <div>
+                  <label className="text-xs text-muted-foreground">Data da Agenda</label>
+                  <Input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Horário da Agenda</label>
+                  <Input type="time" value={horarioAgenda} onChange={e => setHorarioAgenda(e.target.value)} className="bg-secondary mt-1" />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
+                    <Button type="button" variant="outline" size="sm" onClick={addNfEntry} className="text-xs border-primary/50 text-primary">
+                      <Plus className="h-3 w-3 mr-1" /> Adicionar NF
+                    </Button>
+                  </div>
+                  {nfEntries.map((nf, i) => (
+                    <div key={i} className="flex gap-2 items-start">
+                      <div className="flex-1 space-y-1">
+                        <Input placeholder={`Número NF ${i + 1} *`} value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
+                        <Input type="number" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
+                      </div>
+                      {nfEntries.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
       {/* Edit dialog */}
-      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); resetForm(); } }}>
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) setEditItem(null); }}>
         <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Editar Recebimento</DialogTitle></DialogHeader>
-          {formFields}
-          <Button onClick={handleEdit} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Atualizar</Button>
+          <div className="space-y-3">
+            <Input placeholder="Número NF *" value={editForm.numero_nf} onChange={e => setEditForm({...editForm, numero_nf: e.target.value})} className="bg-secondary" />
+            <Input placeholder="Fornecedor *" value={editForm.fornecedor} onChange={e => setEditForm({...editForm, fornecedor: e.target.value})} className="bg-secondary" />
+            <Input type="number" placeholder="Qtd Volumes (Caixas)" value={editForm.quantidade_volumes || ""} onChange={e => setEditForm({...editForm, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
+            <div>
+              <label className="text-xs text-muted-foreground">Data da Agenda</label>
+              <Input type="date" value={editForm.data_prevista} onChange={e => setEditForm({...editForm, data_prevista: e.target.value})} className="bg-secondary mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Horário da Agenda</label>
+              <Input type="time" value={editForm.horario_agenda} onChange={e => setEditForm({...editForm, horario_agenda: e.target.value})} className="bg-secondary mt-1" />
+            </div>
+            <Button onClick={handleEdit} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Atualizar</Button>
+          </div>
         </DialogContent>
       </Dialog>
 

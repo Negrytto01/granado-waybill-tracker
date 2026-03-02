@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useRealtime } from "@/hooks/useRealtime";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Truck, Package, CalendarDays, CheckCircle, FileText, Users, History, BarChart3, ShoppingCart, AlertTriangle, Wallet, DollarSign } from "lucide-react";
+import { Truck, Package, CalendarDays, CheckCircle, Users, History, BarChart3, ShoppingCart, AlertTriangle, Wallet, DollarSign, Calendar } from "lucide-react";
 
 interface Stats {
   aguardando: number;
@@ -46,6 +46,7 @@ const DashboardPage = () => {
 
   const allQuickActions = [
     { label: "Agenda", icon: CalendarDays, path: "/agenda", page: "agenda", color: "bg-blue-500/20 text-blue-400" },
+    { label: "Calendário", icon: Calendar, path: "/calendario", page: "calendario", color: "bg-indigo-500/20 text-indigo-400" },
     { label: "Descarga", icon: Truck, path: "/descarga", page: "descarga", color: "bg-orange-500/20 text-orange-400" },
     { label: "Armazenagem", icon: Package, path: "/armazenagem", page: "armazenagem", color: "bg-purple-500/20 text-purple-400" },
     { label: "Compras", icon: ShoppingCart, path: "/compras", page: "compras", color: "bg-teal-500/20 text-teal-400" },

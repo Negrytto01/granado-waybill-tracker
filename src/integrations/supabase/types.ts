@@ -201,6 +201,8 @@ export type Database = {
           quantidade_itens: number | null
           quantidade_volumes: number | null
           status: Database["public"]["Enums"]["recebimento_status"]
+          tipo_descarga: string | null
+          toneladas: number | null
           transportadora: string | null
           usuario_responsavel: string | null
           valor_cobrado: number | null
@@ -226,6 +228,8 @@ export type Database = {
           quantidade_itens?: number | null
           quantidade_volumes?: number | null
           status?: Database["public"]["Enums"]["recebimento_status"]
+          tipo_descarga?: string | null
+          toneladas?: number | null
           transportadora?: string | null
           usuario_responsavel?: string | null
           valor_cobrado?: number | null
@@ -251,6 +255,8 @@ export type Database = {
           quantidade_itens?: number | null
           quantidade_volumes?: number | null
           status?: Database["public"]["Enums"]["recebimento_status"]
+          tipo_descarga?: string | null
+          toneladas?: number | null
           transportadora?: string | null
           usuario_responsavel?: string | null
           valor_cobrado?: number | null
@@ -260,6 +266,7 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          ativo: boolean
           cargo: Database["public"]["Enums"]["cargo_tipo"]
           data_criacao: string
           id: string
@@ -267,6 +274,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ativo?: boolean
           cargo?: Database["public"]["Enums"]["cargo_tipo"]
           data_criacao?: string
           id?: string
@@ -274,6 +282,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ativo?: boolean
           cargo?: Database["public"]["Enums"]["cargo_tipo"]
           data_criacao?: string
           id?: string
@@ -289,6 +298,7 @@ export type Database = {
           id: string
           valor_por_caixa: number
           valor_por_pallet: number
+          valor_por_tonelada: number
         }
         Insert: {
           atualizado_em?: string
@@ -296,6 +306,7 @@ export type Database = {
           id?: string
           valor_por_caixa?: number
           valor_por_pallet?: number
+          valor_por_tonelada?: number
         }
         Update: {
           atualizado_em?: string
@@ -303,6 +314,7 @@ export type Database = {
           id?: string
           valor_por_caixa?: number
           valor_por_pallet?: number
+          valor_por_tonelada?: number
         }
         Relationships: []
       }

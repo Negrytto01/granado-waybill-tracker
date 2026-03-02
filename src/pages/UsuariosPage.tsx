@@ -4,9 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Users, Trash2 } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 
@@ -45,11 +46,11 @@ const UsuariosPage = () => {
     }
   };
 
-  const handleDelete = async (u: any) => {
-    if (!confirm(`Remover o usuário ${u.nome}?`)) return;
-    const { error } = await supabase.from("usuarios").delete().eq("id", u.id);
+  const toggleAtivo = async (u: any) => {
+    const newStatus = !(u.ativo ?? true);
+    const { error } = await supabase.from("usuarios").update({ ativo: newStatus }).eq("id", u.id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Usuário removido!");
+    toast.success(newStatus ? "Usuário ativado!" : "Usuário desativado!");
     fetchData();
   };
 
@@ -94,14 +95,15 @@ const UsuariosPage = () => {
 
       <div className="space-y-2">
         {usuarios.map(u => (
-          <div key={u.id} className="p-4 rounded-lg border border-border bg-card/60 flex items-center justify-between">
+          <div key={u.id} className={`p-4 rounded-lg border border-border bg-card/60 flex items-center justify-between ${!(u.ativo ?? true) ? "opacity-50" : ""}`}>
             <div>
               <p className="font-heading text-foreground">{u.nome}</p>
               <p className="text-xs text-muted-foreground">{u.cargo} · {formatDateTime(u.data_criacao)}</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} className="text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">{(u.ativo ?? true) ? "Ativo" : "Inativo"}</span>
+              <Switch checked={u.ativo ?? true} onCheckedChange={() => toggleAtivo(u)} />
+            </div>
           </div>
         ))}
         {usuarios.length === 0 && (

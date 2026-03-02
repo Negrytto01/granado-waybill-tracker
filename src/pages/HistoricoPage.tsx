@@ -4,10 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate, formatDateTime, formatTime, getStatusClass, calcDuration } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
-import { History, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 const HistoricoPage = () => {
   const { profile } = useAuth();
@@ -42,14 +42,17 @@ const HistoricoPage = () => {
   });
 
   const handleDeleteRec = async (id: string) => {
-    if (!confirm("Remover este registro?")) return;
-    await supabase.from("recebimentos").delete().eq("id", id);
+    if (!confirm("Remover este registro e todos os dados vinculados (armazenagem, financeiro)?")) return;
+    const { error } = await supabase.from("recebimentos").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Registro removido com todos os dados vinculados!");
     fetchAll();
   };
 
   const handleDeleteArm = async (id: string) => {
     if (!confirm("Remover este registro?")) return;
     await supabase.from("armazenagem").delete().eq("id", id);
+    toast.success("Removido!");
     fetchAll();
   };
 
@@ -77,10 +80,7 @@ const HistoricoPage = () => {
             const isExpanded = expandedId === r.id;
             return (
               <div key={r.id} className="rounded-lg border border-border bg-card/40">
-                <div
-                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-secondary/20"
-                  onClick={() => setExpandedId(isExpanded ? null : r.id)}
-                >
+                <div className="p-3 flex items-center justify-between cursor-pointer hover:bg-secondary/20" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-heading text-foreground">NF {r.numero_nf}</span>
@@ -89,9 +89,7 @@ const HistoricoPage = () => {
                     <p className="text-xs text-muted-foreground">{r.fornecedor} · {formatDate(r.data_prevista)} · {r.usuario_responsavel}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {r.valor_cobrado > 0 && (
-                      <span className="text-sm font-heading text-primary">R$ {Number(r.valor_cobrado).toFixed(2)}</span>
-                    )}
+                    {r.valor_cobrado > 0 && <span className="text-sm font-heading text-primary">R$ {Number(r.valor_cobrado).toFixed(2)}</span>}
                     {isAdmin && (
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteRec(r.id); }} className="text-destructive hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
@@ -109,7 +107,6 @@ const HistoricoPage = () => {
                       <div><span className="text-muted-foreground">Resp:</span> <span className="text-foreground">{r.usuario_responsavel || "-"}</span></div>
                     </div>
 
-                    {/* Chronometer section */}
                     <div className="p-3 rounded-lg bg-secondary/30 space-y-2">
                       <h4 className="font-heading text-sm text-primary">⏱ Cronômetro de Descarga</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
@@ -127,7 +124,7 @@ const HistoricoPage = () => {
                         )}
                         {r.hora_desacoplagem && r.hora_inicio_descarga && (
                           <div className="flex justify-between p-2 rounded bg-card/50">
-                            <span className="text-muted-foreground">Desacoplagem → Início Descarga:</span>
+                            <span className="text-muted-foreground">Desacoplagem → Início:</span>
                             <span className="text-foreground font-medium">{calcDuration(r.hora_desacoplagem, r.hora_inicio_descarga)}</span>
                           </div>
                         )}
@@ -140,12 +137,13 @@ const HistoricoPage = () => {
                       </div>
                     </div>
 
-                    {/* Pricing section */}
-                    {(r.caixas_batidas > 0 || r.pallets_descarregados > 0) && (
+                    {(r.caixas_batidas > 0 || r.pallets_descarregados > 0 || r.toneladas > 0) && (
                       <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-1 text-sm">
                         <h4 className="font-heading text-sm text-primary">💰 Valor Cobrado</h4>
                         {r.caixas_batidas > 0 && <p className="text-foreground">Caixas batidas: {r.caixas_batidas}</p>}
                         {r.pallets_descarregados > 0 && <p className="text-foreground">Pallets descarregados: {r.pallets_descarregados}</p>}
+                        {r.toneladas > 0 && <p className="text-foreground">Toneladas: {r.toneladas}</p>}
+                        {r.tipo_descarga && <p className="text-foreground">Tipo: {r.tipo_descarga}</p>}
                         <p className="font-heading text-lg text-primary">Total: R$ {Number(r.valor_cobrado).toFixed(2)}</p>
                       </div>
                     )}

@@ -96,6 +96,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password: senha,
     });
     if (error) throw new Error("Usuário ou senha inválidos");
+    
+    // Check if user is active
+    const { data: userProfile } = await supabase
+      .from("usuarios")
+      .select("ativo")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id || "")
+      .maybeSingle();
+    
+    if (userProfile && userProfile.ativo === false) {
+      await supabase.auth.signOut();
+      throw new Error("Usuário desativado. Contate o administrador.");
+    }
   };
 
   const signUp = async (nome: string, senha: string, cargo: string) => {

@@ -44,7 +44,7 @@ export const usePermissions = () => {
 
   const getAccessiblePages = useCallback((): string[] => {
     if (!profile) return [];
-    if (isAdmin) return ["dashboard", "agenda", "descarga", "armazenagem", "relatorios", "historico", "usuarios", "valores", "compras", "fornecedores", "financeiro"];
+    if (isAdmin) return ["dashboard", "agenda", "descarga", "armazenagem", "relatorios", "historico", "usuarios", "valores", "compras", "fornecedores", "financeiro", "calendario"];
     return permissoes
       .filter(p => p.cargo === profile.cargo && p.ativo)
       .map(p => p.pagina);

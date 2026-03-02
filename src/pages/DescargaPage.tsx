@@ -3,12 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getStatusClass, formatDate, formatTime, calcDuration } from "@/lib/helpers";
+import { getStatusClass, formatTime, calcDuration } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playDescargaFinalizada } from "@/lib/sounds";
-import { Play, Square, Truck, Link, Unlink, CheckCircle } from "lucide-react";
+import { Play, Truck, Link, Unlink, CheckCircle } from "lucide-react";
 
 const DescargaPage = () => {
   const { profile } = useAuth();
@@ -16,7 +17,9 @@ const DescargaPage = () => {
   const [finalizarModal, setFinalizarModal] = useState<any>(null);
   const [caixasBatidas, setCaixasBatidas] = useState("");
   const [palletsDescarregados, setPalletsDescarregados] = useState("");
-  const [valoresConfig, setValoresConfig] = useState({ valor_por_caixa: 0, valor_por_pallet: 0 });
+  const [toneladas, setToneladas] = useState("");
+  const [tipoDescarga, setTipoDescarga] = useState("nenhum");
+  const [valoresConfig, setValoresConfig] = useState({ valor_por_caixa: 0, valor_por_pallet: 0, valor_por_tonelada: 0 });
   const isAdmin = profile?.cargo === "Administrador";
 
   const fetchData = useCallback(async () => {
@@ -27,7 +30,11 @@ const DescargaPage = () => {
 
     const { data: val } = await supabase.from("valores_descarga").select("*").limit(1);
     if (val && val.length > 0) {
-      setValoresConfig({ valor_por_caixa: Number(val[0].valor_por_caixa), valor_por_pallet: Number(val[0].valor_por_pallet) });
+      setValoresConfig({
+        valor_por_caixa: Number(val[0].valor_por_caixa),
+        valor_por_pallet: Number(val[0].valor_por_pallet),
+        valor_por_tonelada: Number(val[0].valor_por_tonelada || 0),
+      });
     }
   }, []);
 
@@ -42,31 +49,17 @@ const DescargaPage = () => {
   }, [recebimentos]);
 
   const acoplar = async (id: string) => {
-    const { error } = await supabase.from("recebimentos").update({
-      status: "ACOPLADO" as any,
-      hora_acoplagem: new Date().toISOString(),
-      usuario_responsavel: profile?.nome,
-    }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    await supabase.from("recebimentos").update({ status: "ACOPLADO" as any, hora_acoplagem: new Date().toISOString(), usuario_responsavel: profile?.nome }).eq("id", id);
     toast.success("Caminhão acoplado!");
   };
 
   const desacoplar = async (id: string) => {
-    const { error } = await supabase.from("recebimentos").update({
-      status: "DESACOPLADO" as any,
-      hora_desacoplagem: new Date().toISOString(),
-    }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    await supabase.from("recebimentos").update({ status: "DESACOPLADO" as any, hora_desacoplagem: new Date().toISOString() }).eq("id", id);
     toast.success("Caminhão desacoplado!");
   };
 
   const iniciarDescarga = async (id: string) => {
-    const { error } = await supabase.from("recebimentos").update({
-      status: "EM DESCARGA" as any,
-      hora_inicio_descarga: new Date().toISOString(),
-      usuario_responsavel: profile?.nome,
-    }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    await supabase.from("recebimentos").update({ status: "EM DESCARGA" as any, hora_inicio_descarga: new Date().toISOString(), usuario_responsavel: profile?.nome }).eq("id", id);
     toast.success("Descarga iniciada!");
   };
 
@@ -74,25 +67,39 @@ const DescargaPage = () => {
     setFinalizarModal(r);
     setCaixasBatidas("");
     setPalletsDescarregados("");
+    setToneladas("");
+    setTipoDescarga("nenhum");
+  };
+
+  const calcValorTotal = () => {
+    const caixas = parseInt(caixasBatidas) || 0;
+    const pallets = parseInt(palletsDescarregados) || 0;
+    const ton = parseFloat(toneladas) || 0;
+    let total = 0;
+    if (tipoDescarga === "caixa" || tipoDescarga === "misto") total += caixas * valoresConfig.valor_por_caixa;
+    if (tipoDescarga === "pallet" || tipoDescarga === "misto") total += pallets * valoresConfig.valor_por_pallet;
+    if (tipoDescarga === "tonelada") total += ton * valoresConfig.valor_por_tonelada;
+    return total;
   };
 
   const finalizarDescarga = async () => {
     if (!finalizarModal) return;
     const caixas = parseInt(caixasBatidas) || 0;
     const pallets = parseInt(palletsDescarregados) || 0;
-    const valorTotal = (caixas * valoresConfig.valor_por_caixa) + (pallets * valoresConfig.valor_por_pallet);
+    const ton = parseFloat(toneladas) || 0;
+    const valorTotal = calcValorTotal();
 
     const now = new Date().toISOString();
-    const { error: errRec } = await supabase.from("recebimentos").update({
+    await supabase.from("recebimentos").update({
       status: "AGUARDANDO ARMAZENAGEM" as any,
       hora_fim_descarga: now,
       caixas_batidas: caixas,
       pallets_descarregados: pallets,
+      toneladas: ton,
+      tipo_descarga: tipoDescarga,
       valor_cobrado: valorTotal,
     }).eq("id", finalizarModal.id);
-    if (errRec) { toast.error(errRec.message); return; }
 
-    // Create armazenagem entry
     await supabase.from("armazenagem").insert([{
       recebimento_id: finalizarModal.id,
       quantidade_itens: finalizarModal.quantidade_itens || 0,
@@ -101,7 +108,6 @@ const DescargaPage = () => {
       usuario_responsavel: profile?.nome,
     }]);
 
-    // Create financial entry if valor > 0
     if (valorTotal > 0) {
       await supabase.from("fluxo_financeiro").insert([{
         tipo: "ENTRADA",
@@ -113,14 +119,13 @@ const DescargaPage = () => {
     }
 
     playDescargaFinalizada();
-    toast.success(`Descarga finalizada! Valor cobrado: R$ ${valorTotal.toFixed(2)}`);
+    toast.success(valorTotal > 0 ? `Descarga finalizada! Valor: R$ ${valorTotal.toFixed(2)}` : "Descarga finalizada!");
     setFinalizarModal(null);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este recebimento?")) return;
-    const { error } = await supabase.from("recebimentos").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    await supabase.from("recebimentos").delete().eq("id", id);
     toast.success("Removido!");
   };
 
@@ -186,28 +191,59 @@ const DescargaPage = () => {
         </div>
       )}
 
-      {/* Finalizar modal */}
+      {/* Finalizar modal - OPTIONAL fields */}
       <Dialog open={!!finalizarModal} onOpenChange={(open) => !open && setFinalizarModal(null)}>
         <DialogContent className="bg-card border-border">
-          <DialogHeader><DialogTitle className="font-heading neon-text">Finalizar Descarga — Valor Cobrado</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-heading neon-text">Finalizar Descarga</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">NF {finalizarModal?.numero_nf} — {finalizarModal?.fornecedor}</p>
+            <p className="text-xs text-muted-foreground italic">Os campos abaixo são opcionais. Preencha apenas se houve cobrança.</p>
+
             <div>
-              <label className="text-sm text-muted-foreground">Caixas Batidas</label>
-              <Input type="number" value={caixasBatidas} onChange={e => setCaixasBatidas(e.target.value)} className="bg-secondary mt-1" placeholder="0" />
-              <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_caixa.toFixed(2)}</p>
+              <label className="text-sm text-muted-foreground">Tipo de Descarga</label>
+              <Select value={tipoDescarga} onValueChange={setTipoDescarga}>
+                <SelectTrigger className="bg-secondary mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhum">Sem cobrança</SelectItem>
+                  <SelectItem value="caixa">Por Caixa</SelectItem>
+                  <SelectItem value="pallet">Por Pallet</SelectItem>
+                  <SelectItem value="tonelada">Por Peso (Tonelada)</SelectItem>
+                  <SelectItem value="misto">Misto (Caixa + Pallet)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="text-sm text-muted-foreground">Pallets Descarregados</label>
-              <Input type="number" value={palletsDescarregados} onChange={e => setPalletsDescarregados(e.target.value)} className="bg-secondary mt-1" placeholder="0" />
-              <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_pallet.toFixed(2)}</p>
-            </div>
-            <div className="p-3 rounded-lg border border-primary/30 bg-primary/10">
-              <p className="text-sm text-muted-foreground">Valor Total Cobrado:</p>
-              <p className="font-heading text-2xl text-primary">
-                R$ {(((parseInt(caixasBatidas) || 0) * valoresConfig.valor_por_caixa) + ((parseInt(palletsDescarregados) || 0) * valoresConfig.valor_por_pallet)).toFixed(2)}
-              </p>
-            </div>
+
+            {(tipoDescarga === "caixa" || tipoDescarga === "misto") && (
+              <div>
+                <label className="text-sm text-muted-foreground">Caixas Batidas</label>
+                <Input type="number" value={caixasBatidas} onChange={e => setCaixasBatidas(e.target.value)} className="bg-secondary mt-1" placeholder="0" />
+                <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_caixa.toFixed(2)}</p>
+              </div>
+            )}
+
+            {(tipoDescarga === "pallet" || tipoDescarga === "misto") && (
+              <div>
+                <label className="text-sm text-muted-foreground">Pallets Descarregados</label>
+                <Input type="number" value={palletsDescarregados} onChange={e => setPalletsDescarregados(e.target.value)} className="bg-secondary mt-1" placeholder="0" />
+                <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_pallet.toFixed(2)}</p>
+              </div>
+            )}
+
+            {tipoDescarga === "tonelada" && (
+              <div>
+                <label className="text-sm text-muted-foreground">Toneladas</label>
+                <Input type="number" step="0.01" value={toneladas} onChange={e => setToneladas(e.target.value)} className="bg-secondary mt-1" placeholder="0.00" />
+                <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_tonelada.toFixed(2)}</p>
+              </div>
+            )}
+
+            {tipoDescarga !== "nenhum" && (
+              <div className="p-3 rounded-lg border border-primary/30 bg-primary/10">
+                <p className="text-sm text-muted-foreground">Valor Total Cobrado:</p>
+                <p className="font-heading text-2xl text-primary">R$ {calcValorTotal().toFixed(2)}</p>
+              </div>
+            )}
+
             <Button onClick={finalizarDescarga} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
               <CheckCircle className="mr-2 h-4 w-4" /> Confirmar Finalização
             </Button>

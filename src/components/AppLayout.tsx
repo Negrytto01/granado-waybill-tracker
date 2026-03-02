@@ -1,20 +1,21 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useNavigate, useLocation } from "react-router-dom";
 import ParticlesBackground from "@/components/ParticlesBackground";
 import Watermark from "@/components/Watermark";
 import logoGdr from "@/assets/logo-gdr.png";
 import {
   LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
-  DollarSign, ShoppingCart, AlertTriangle, Wallet, Shield
+  DollarSign, ShoppingCart, AlertTriangle, Wallet, Shield, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 const allNavItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/", page: "dashboard" },
   { label: "Agenda", icon: CalendarDays, path: "/agenda", page: "agenda" },
+  { label: "Calendário", icon: Calendar, path: "/calendario", page: "calendario" },
   { label: "Descarga", icon: Truck, path: "/descarga", page: "descarga" },
   { label: "Armazenagem", icon: Package, path: "/armazenagem", page: "armazenagem" },
   { label: "Compras", icon: ShoppingCart, path: "/compras", page: "compras" },
@@ -24,7 +25,7 @@ const allNavItems = [
   { label: "Valores", icon: DollarSign, path: "/valores", page: "valores" },
   { label: "Financeiro", icon: Wallet, path: "/financeiro", page: "financeiro" },
   { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
-  { label: "Permissões", icon: Shield, path: "/permissoes", page: "usuarios" }, // admin only
+  { label: "Permissões", icon: Shield, path: "/permissoes", page: "usuarios" },
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
@@ -33,6 +34,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Auto-logout after 30 min inactivity
+  useInactivityTimeout();
 
   const filteredNav = allNavItems.filter(item => {
     if (item.path === "/permissoes") return isAdmin;
