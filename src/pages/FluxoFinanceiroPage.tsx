@@ -13,7 +13,7 @@ const FluxoFinanceiroPage = () => {
   const [fluxos, setFluxos] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({ descricao: "", valor: "" });
-  const [mesRef, setMesRef] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [mesRef, setMesRef] = useState(new Date().toISOString().slice(0, 7));
   const isAdmin = profile?.cargo === "Administrador";
 
   const fetchData = useCallback(async () => {
@@ -53,7 +53,9 @@ const FluxoFinanceiroPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("fluxo_financeiro").delete().eq("id", id);
+    if (!confirm("Tem certeza que deseja remover?")) return;
+    const { error } = await supabase.from("fluxo_financeiro").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Removido!");
     fetchData();
   };
@@ -88,7 +90,6 @@ const FluxoFinanceiroPage = () => {
         </div>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm">
           <div className="flex items-center gap-2 mb-1">
@@ -113,16 +114,11 @@ const FluxoFinanceiroPage = () => {
         </div>
       </div>
 
-      {/* List */}
       <div className="space-y-2">
         {fluxos.map(f => (
           <div key={f.id} className="p-3 rounded-lg border border-border bg-card/40 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {f.tipo === "ENTRADA" ? (
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-red-400" />
-              )}
+              {f.tipo === "ENTRADA" ? <TrendingUp className="h-4 w-4 text-emerald-400" /> : <TrendingDown className="h-4 w-4 text-red-400" />}
               <div>
                 <p className="text-foreground">{f.descricao}</p>
                 <p className="text-xs text-muted-foreground">{formatDateTime(f.data_criacao)} · {f.criado_por}</p>
@@ -132,7 +128,7 @@ const FluxoFinanceiroPage = () => {
               <span className={`font-heading text-lg ${f.tipo === "ENTRADA" ? "text-emerald-400" : "text-red-400"}`}>
                 {f.tipo === "ENTRADA" ? "+" : "-"} R$ {Number(f.valor).toFixed(2)}
               </span>
-              {isAdmin && f.tipo === "SAIDA" && (
+              {isAdmin && (
                 <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="text-destructive hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </Button>
