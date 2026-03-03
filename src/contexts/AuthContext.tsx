@@ -55,21 +55,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.warn("Auth loading timeout - forcing load complete");
         setLoading(false);
       }
-    }, 5000);
+    }, 3000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
-
+    // Initialize session first
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       setUser(session?.user ?? null);
@@ -82,10 +70,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (mounted) setLoading(false);
     });
 
-    // Handle screen lock/unlock - refresh session on visibility change
-    const handleVisibilityChange = () => {
+    // Then listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!mounted) return;
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          // Use setTimeout to avoid Supabase lock contention
+          setTimeout(() => {
+            if (mounted) fetchProfile(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      }
+    );
+
+    // Handle screen lock/unlock
+    const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
           if (!mounted) return;
           setUser(session?.user ?? null);
           if (session?.user) {
@@ -93,7 +99,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             setProfile(null);
           }
-        }).catch(console.error);
+        } catch (err) {
+          console.error("Visibility change session error:", err);
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
