@@ -45,7 +45,7 @@ const LoginPage = () => {
     if (senha.length < 6) { toast.error("Senha mínima: 6 caracteres"); return; }
     setLoading(true);
     try {
-      await signUp(nome, senha, "Administrador");
+      await signUp(nome, senha, "Master");
       toast.success("Administrador criado! Faça login.");
       setIsFirstUser(false);
       setSenha("");

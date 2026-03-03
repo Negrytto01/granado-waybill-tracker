@@ -55,7 +55,7 @@ const ValoresDescargaPage = () => {
     fetchData();
   };
 
-  if (profile?.cargo !== "Administrador") {
+  if (profile?.cargo !== "Master") {
     return <div className="text-center py-12 text-muted-foreground">Acesso restrito a administradores</div>;
   }
   if (loading) return <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>;

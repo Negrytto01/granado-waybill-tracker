@@ -11,13 +11,13 @@ import { UserPlus, Users } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 
-const cargos = ["Administrador", "Recebimento", "Conferente", "Estoque", "Fiscal", "Compras", "Financeiro", "Faturamento"];
+const cargos = ["Master", "Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal"];
 
 const UsuariosPage = () => {
   const { profile, signUp } = useAuth();
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
-  const [form, setForm] = useState({ nome: "", senha: "", confirmarSenha: "", cargo: "Recebimento" });
+  const [form, setForm] = useState({ nome: "", senha: "", confirmarSenha: "", cargo: "Agendamento/Conferente" });
   const [loading, setLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -37,7 +37,7 @@ const UsuariosPage = () => {
       await signUp(form.nome, form.senha, form.cargo);
       toast.success("Usuário cadastrado!");
       setOpenNew(false);
-      setForm({ nome: "", senha: "", confirmarSenha: "", cargo: "Recebimento" });
+      setForm({ nome: "", senha: "", confirmarSenha: "", cargo: "Agendamento/Conferente" });
       fetchData();
     } catch (err: any) {
       toast.error(err.message || "Erro ao criar usuário");
@@ -54,7 +54,7 @@ const UsuariosPage = () => {
     fetchData();
   };
 
-  if (profile?.cargo !== "Administrador") {
+  if (profile?.cargo !== "Master") {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <Users className="mx-auto h-12 w-12 mb-3 opacity-30" />

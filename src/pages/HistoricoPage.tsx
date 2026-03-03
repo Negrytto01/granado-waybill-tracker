@@ -18,7 +18,7 @@ const HistoricoPage = () => {
   const [filterUsuario, setFilterUsuario] = useState("");
   const [filterData, setFilterData] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   const fetchAll = useCallback(async () => {
     const [rec, arm] = await Promise.all([
