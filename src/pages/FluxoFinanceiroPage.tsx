@@ -14,7 +14,7 @@ const FluxoFinanceiroPage = () => {
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({ descricao: "", valor: "" });
   const [mesRef, setMesRef] = useState(new Date().toISOString().slice(0, 7));
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
     const startDate = `${mesRef}-01`;

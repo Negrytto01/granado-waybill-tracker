@@ -34,8 +34,8 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const { data: callerProfile } = await supabaseAdmin.from("usuarios").select("cargo").eq("user_id", caller.id).single();
-      if (callerProfile?.cargo !== "Administrador") {
-        return new Response(JSON.stringify({ error: "Apenas administradores podem cadastrar usuários" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (callerProfile?.cargo !== 'Master') {
+        return new Response(JSON.stringify({ error: "Apenas o Master pode cadastrar usuários" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 

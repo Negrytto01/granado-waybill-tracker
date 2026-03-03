@@ -27,7 +27,7 @@ const AgendaPage = () => {
   // Single NF fields for edit mode
   const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "" });
   const fileRef = useRef<HTMLInputElement>(null);
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from("recebimentos").select("*").order("data_prevista", { ascending: true }).order("data_criacao", { ascending: false });
@@ -61,12 +61,16 @@ const AgendaPage = () => {
   };
 
   const handleCreate = async () => {
+    // At least one NF entry with some content, or a fornecedor
     const validNFs = nfEntries.filter(nf => nf.numero_nf.trim());
-    if (validNFs.length === 0 || !fornecedor) { toast.error("NF e Fornecedor obrigatórios"); return; }
+    if (validNFs.length === 0) {
+      // Allow saving with just fornecedor if no NF
+      validNFs.push({ numero_nf: "S/N", quantidade_volumes: 0 });
+    }
 
     const inserts = validNFs.map(nf => ({
       numero_nf: nf.numero_nf,
-      fornecedor,
+      fornecedor: fornecedor || "Não informado",
       quantidade_volumes: Number(nf.quantidade_volumes),
       data_prevista: dataPrevista,
       horario_agenda: horarioAgenda || null,

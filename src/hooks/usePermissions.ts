@@ -33,7 +33,7 @@ export const usePermissions = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchPermissoes]);
 
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   const hasAccess = useCallback((pagina: string): boolean => {
     if (!profile) return false;

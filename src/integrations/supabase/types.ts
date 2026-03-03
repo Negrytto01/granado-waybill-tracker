@@ -339,6 +339,9 @@ export type Database = {
         | "Compras"
         | "Financeiro"
         | "Faturamento"
+        | "Master"
+        | "Agendamento/Conferente"
+        | "Compra"
       recebimento_status:
         | "AGENDADO"
         | "CHEGOU"
@@ -489,6 +492,9 @@ export const Constants = {
         "Compras",
         "Financeiro",
         "Faturamento",
+        "Master",
+        "Agendamento/Conferente",
+        "Compra",
       ],
       recebimento_status: [
         "AGENDADO",

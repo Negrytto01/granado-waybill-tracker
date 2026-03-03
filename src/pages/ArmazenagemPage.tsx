@@ -17,7 +17,7 @@ const getAgingColor = (dataCriacao: string): { color: string; label: string; day
 const ArmazenagemPage = () => {
   const { profile } = useAuth();
   const [items, setItems] = useState<any[]>([]);
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from("armazenagem").select("*, recebimentos(numero_nf, fornecedor, hora_fim_descarga)")

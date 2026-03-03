@@ -20,7 +20,7 @@ const DescargaPage = () => {
   const [toneladas, setToneladas] = useState("");
   const [tipoDescarga, setTipoDescarga] = useState("nenhum");
   const [valoresConfig, setValoresConfig] = useState({ valor_por_caixa: 0, valor_por_pallet: 0, valor_por_tonelada: 0 });
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from("recebimentos").select("*")

@@ -13,7 +13,7 @@ const FornecedoresUrgenciaPage = () => {
   const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({ nome_fornecedor: "", observacoes: "" });
-  const isAdmin = profile?.cargo === "Administrador";
+  const isAdmin = profile?.cargo === "Master";
 
   // Check if we're in the 3rd week of the month (days 15-21)
   const today = new Date();
