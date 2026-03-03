@@ -181,7 +181,7 @@ const AgendaPage = () => {
             <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle className="font-heading neon-text">Novo Recebimento</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <Input placeholder="Fornecedor *" value={fornecedor} onChange={e => setFornecedor(e.target.value)} className="bg-secondary" />
+                <Input placeholder="Fornecedor" value={fornecedor} onChange={e => setFornecedor(e.target.value)} className="bg-secondary" />
                 <div>
                   <label className="text-xs text-muted-foreground">Data da Agenda</label>
                   <Input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)} className="bg-secondary mt-1" />
@@ -201,8 +201,8 @@ const AgendaPage = () => {
                   {nfEntries.map((nf, i) => (
                     <div key={i} className="flex gap-2 items-start">
                       <div className="flex-1 space-y-1">
-                        <Input placeholder={`Número NF ${i + 1} *`} value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
-                        <Input type="number" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
+                        <Input placeholder={`Número NF ${i + 1}`} inputMode="numeric" value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
+                        <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
                       </div>
                       {nfEntries.length > 1 && (
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
@@ -225,9 +225,9 @@ const AgendaPage = () => {
         <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Editar Recebimento</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="Número NF *" value={editForm.numero_nf} onChange={e => setEditForm({...editForm, numero_nf: e.target.value})} className="bg-secondary" />
-            <Input placeholder="Fornecedor *" value={editForm.fornecedor} onChange={e => setEditForm({...editForm, fornecedor: e.target.value})} className="bg-secondary" />
-            <Input type="number" placeholder="Qtd Volumes (Caixas)" value={editForm.quantidade_volumes || ""} onChange={e => setEditForm({...editForm, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
+            <Input placeholder="Número NF" inputMode="numeric" value={editForm.numero_nf} onChange={e => setEditForm({...editForm, numero_nf: e.target.value})} className="bg-secondary" />
+            <Input placeholder="Fornecedor" value={editForm.fornecedor} onChange={e => setEditForm({...editForm, fornecedor: e.target.value})} className="bg-secondary" />
+            <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={editForm.quantidade_volumes || ""} onChange={e => setEditForm({...editForm, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
             <div>
               <label className="text-xs text-muted-foreground">Data da Agenda</label>
               <Input type="date" value={editForm.data_prevista} onChange={e => setEditForm({...editForm, data_prevista: e.target.value})} className="bg-secondary mt-1" />
