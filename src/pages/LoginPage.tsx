@@ -18,8 +18,13 @@ const LoginPage = () => {
   const [checkingFirst, setCheckingFirst] = useState(true);
 
   useEffect(() => {
-    supabase.from("usuarios").select("id", { count: "exact", head: true }).then(({ count }) => {
-      setIsFirstUser(count === 0);
+    supabase.functions.invoke("check-setup").then(({ data, error }) => {
+      if (error) {
+        console.error("Check setup error:", error);
+        setIsFirstUser(false);
+      } else {
+        setIsFirstUser(data?.needsSetup === true);
+      }
       setCheckingFirst(false);
     });
   }, []);
