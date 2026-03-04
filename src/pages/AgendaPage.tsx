@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { getStatusClass, parseXML, formatDate, formatTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Upload, Truck, Trash2, Edit, X } from "lucide-react";
+import { Plus, Truck, Trash2, Edit, X } from "lucide-react";
 
 interface NFEntry {
   numero_nf: string;
@@ -27,7 +27,6 @@ const AgendaPage = () => {
   const [horarioAgenda, setHorarioAgenda] = useState("");
   const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
   const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "", is_pallet: false });
-  const fileRef = useRef<HTMLInputElement>(null);
   const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
@@ -122,31 +121,6 @@ const AgendaPage = () => {
     setEditItem(r);
   };
 
-  const handleXML = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    try {
-      const parsed = parseXML(text);
-      if (!parsed.numero_nf) { toast.error("NF não encontrada no XML"); return; }
-      const totalItens = parsed.itens.reduce((a, b) => a + b.quantidade, 0);
-      const { error } = await supabase.from("recebimentos").insert([{
-        numero_nf: parsed.numero_nf,
-        fornecedor: parsed.fornecedor || "Não identificado",
-        cnpj: parsed.cnpj,
-        quantidade_itens: Math.round(totalItens),
-        xml_nota: text,
-        usuario_responsavel: profile?.nome,
-        status: "AGENDADO" as any,
-        data_prevista: new Date().toISOString().split("T")[0],
-      }]);
-      if (error) { toast.error(error.message); return; }
-      toast.success(`NF ${parsed.numero_nf} importada com sucesso!`);
-    } catch {
-      toast.error("Erro ao processar XML. Verifique o arquivo.");
-    }
-    if (fileRef.current) fileRef.current.value = "";
-  };
 
   const handleChegou = async (id: string) => {
     await supabase.from("recebimentos").update({
@@ -173,10 +147,6 @@ const AgendaPage = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="font-heading text-3xl neon-text">Agenda de Recebimento</h1>
         <div className="flex gap-2">
-          <input ref={fileRef} type="file" accept=".xml" className="hidden" onChange={handleXML} />
-          <Button variant="outline" onClick={() => fileRef.current?.click()} className="border-primary/50 text-primary hover:bg-primary/10">
-            <Upload className="mr-2 h-4 w-4" /> Importar XML
-          </Button>
           <Dialog open={openNew} onOpenChange={(open) => { setOpenNew(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button className="bg-primary text-primary-foreground hover:bg-primary/80">
