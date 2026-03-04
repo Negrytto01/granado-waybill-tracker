@@ -6,6 +6,7 @@ export const getStatusClass = (status: string): string => {
     'DESACOPLADO': 'status-em-descarga',
     'EM DESCARGA': 'status-em-descarga',
     'DESCARGA FINALIZADA': 'status-descarga-finalizada',
+    'AGUARDANDO DESACOPLAGEM': 'status-descarga-finalizada',
     'AGUARDANDO ARMAZENAGEM': 'status-aguardando-armazenagem',
     'FINALIZADO': 'status-finalizado',
     'EM ARMAZENAGEM': 'status-em-descarga',

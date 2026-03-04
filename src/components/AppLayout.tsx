@@ -5,7 +5,7 @@ import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 import { useNavigate, useLocation } from "react-router-dom";
 import ParticlesBackground from "@/components/ParticlesBackground";
 import Watermark from "@/components/Watermark";
-import logoGdr from "@/assets/logo-gdr.png";
+import logoGranado from "@/assets/logo-granado.png";
 import {
   LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
   DollarSign, ShoppingCart, AlertTriangle, Wallet, Shield, Calendar
@@ -52,7 +52,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden text-foreground">
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
-        <img src={logoGdr} alt="GDR" className="h-8 w-8 rounded" />
+        <img src={logoGranado} alt="Granado" className="h-8 w-8 rounded" />
         <span className="font-heading text-xl neon-text tracking-wider hidden sm:block">GDR</span>
         <span className="text-muted-foreground text-xs hidden sm:block">Granado Distribuidora</span>
         <div className="ml-auto flex items-center gap-3">
