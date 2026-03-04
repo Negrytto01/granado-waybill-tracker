@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getStatusClass, parseXML, formatDate, formatTime } from "@/lib/helpers";
@@ -13,6 +14,7 @@ import { Plus, Upload, Truck, Trash2, Edit, X } from "lucide-react";
 interface NFEntry {
   numero_nf: string;
   quantidade_volumes: number;
+  is_pallet: boolean;
 }
 
 const AgendaPage = () => {
@@ -23,9 +25,8 @@ const AgendaPage = () => {
   const [fornecedor, setFornecedor] = useState("");
   const [dataPrevista, setDataPrevista] = useState(new Date().toISOString().split("T")[0]);
   const [horarioAgenda, setHorarioAgenda] = useState("");
-  const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0 }]);
-  // Single NF fields for edit mode
-  const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "" });
+  const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
+  const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "", is_pallet: false });
   const fileRef = useRef<HTMLInputElement>(null);
   const isAdmin = profile?.cargo === "Master";
 
@@ -49,38 +50,40 @@ const AgendaPage = () => {
     setFornecedor("");
     setDataPrevista(new Date().toISOString().split("T")[0]);
     setHorarioAgenda("");
-    setNfEntries([{ numero_nf: "", quantidade_volumes: 0 }]);
+    setNfEntries([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
   };
 
-  const addNfEntry = () => setNfEntries([...nfEntries, { numero_nf: "", quantidade_volumes: 0 }]);
+  const addNfEntry = () => setNfEntries([...nfEntries, { numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
   const removeNfEntry = (i: number) => setNfEntries(nfEntries.filter((_, idx) => idx !== i));
-  const updateNfEntry = (i: number, field: keyof NFEntry, value: string | number) => {
+  const updateNfEntry = (i: number, field: keyof NFEntry, value: string | number | boolean) => {
     const updated = [...nfEntries];
     (updated[i] as any)[field] = value;
     setNfEntries(updated);
   };
 
   const handleCreate = async () => {
-    // At least one NF entry with some content, or a fornecedor
     const validNFs = nfEntries.filter(nf => nf.numero_nf.trim());
     if (validNFs.length === 0) {
-      // Allow saving with just fornecedor if no NF
-      validNFs.push({ numero_nf: "S/N", quantidade_volumes: 0 });
+      validNFs.push({ numero_nf: "S/N", quantidade_volumes: 0, is_pallet: false });
     }
 
-    const inserts = validNFs.map(nf => ({
-      numero_nf: nf.numero_nf,
+    // Consolidate: concatenate NFs, sum non-pallet volumes
+    const concatenatedNFs = validNFs.map(nf => nf.numero_nf).join("/");
+    const totalVolumes = validNFs.filter(nf => !nf.is_pallet).reduce((sum, nf) => sum + Number(nf.quantidade_volumes), 0);
+    const hasPallet = validNFs.some(nf => nf.is_pallet);
+
+    const { error } = await supabase.from("recebimentos").insert([{
+      numero_nf: concatenatedNFs,
       fornecedor: fornecedor || "Não informado",
-      quantidade_volumes: Number(nf.quantidade_volumes),
+      quantidade_volumes: totalVolumes,
       data_prevista: dataPrevista,
       horario_agenda: horarioAgenda || null,
       usuario_responsavel: profile?.nome,
       status: "AGENDADO" as any,
-    }));
-
-    const { error } = await supabase.from("recebimentos").insert(inserts);
+      is_pallet: hasPallet,
+    }]);
     if (error) { toast.error(error.message); return; }
-    toast.success(`${validNFs.length} NF(s) agendada(s)!`);
+    toast.success("Agendamento salvo!");
     setOpenNew(false);
     resetForm();
   };
@@ -93,6 +96,7 @@ const AgendaPage = () => {
       quantidade_volumes: Number(editForm.quantidade_volumes),
       data_prevista: editForm.data_prevista,
       horario_agenda: editForm.horario_agenda || null,
+      is_pallet: editForm.is_pallet,
     }).eq("id", editItem.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Atualizado!");
@@ -113,6 +117,7 @@ const AgendaPage = () => {
       quantidade_volumes: r.quantidade_volumes || 0,
       data_prevista: r.data_prevista || new Date().toISOString().split("T")[0],
       horario_agenda: r.horario_agenda || "",
+      is_pallet: r.is_pallet || false,
     });
     setEditItem(r);
   };
@@ -203,6 +208,16 @@ const AgendaPage = () => {
                       <div className="flex-1 space-y-1">
                         <Input placeholder={`Número NF ${i + 1}`} inputMode="numeric" value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
                         <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
+                        <div className="flex items-center gap-2 py-1">
+                          <Checkbox
+                            id={`pallet-${i}`}
+                            checked={nf.is_pallet}
+                            onCheckedChange={(checked) => updateNfEntry(i, "is_pallet", !!checked)}
+                          />
+                          <label htmlFor={`pallet-${i}`} className="text-xs text-muted-foreground cursor-pointer">
+                            NF de Pallet (não contabiliza volumes/armazenagem)
+                          </label>
+                        </div>
                       </div>
                       {nfEntries.length > 1 && (
                         <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
@@ -211,6 +226,11 @@ const AgendaPage = () => {
                       )}
                     </div>
                   ))}
+                  {nfEntries.length > 1 && (
+                    <div className="p-2 rounded border border-primary/20 bg-primary/5 text-xs text-muted-foreground">
+                      <strong>Resumo:</strong> NFs {nfEntries.filter(n => n.numero_nf.trim()).map(n => n.numero_nf).join("/") || "S/N"} — Total Volumes: {nfEntries.filter(n => !n.is_pallet).reduce((s, n) => s + Number(n.quantidade_volumes), 0)}
+                    </div>
+                  )}
                 </div>
 
                 <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
@@ -228,6 +248,16 @@ const AgendaPage = () => {
             <Input placeholder="Número NF" inputMode="numeric" value={editForm.numero_nf} onChange={e => setEditForm({...editForm, numero_nf: e.target.value})} className="bg-secondary" />
             <Input placeholder="Fornecedor" value={editForm.fornecedor} onChange={e => setEditForm({...editForm, fornecedor: e.target.value})} className="bg-secondary" />
             <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={editForm.quantidade_volumes || ""} onChange={e => setEditForm({...editForm, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                id="edit-pallet"
+                checked={editForm.is_pallet}
+                onCheckedChange={(checked) => setEditForm({...editForm, is_pallet: !!checked})}
+              />
+              <label htmlFor="edit-pallet" className="text-xs text-muted-foreground cursor-pointer">
+                NF de Pallet (não contabiliza volumes/armazenagem)
+              </label>
+            </div>
             <div>
               <label className="text-xs text-muted-foreground">Data da Agenda</label>
               <Input type="date" value={editForm.data_prevista} onChange={e => setEditForm({...editForm, data_prevista: e.target.value})} className="bg-secondary mt-1" />
@@ -251,6 +281,7 @@ const AgendaPage = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-heading text-lg text-foreground">NF {r.numero_nf}</span>
                     <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                    {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
                   </div>
                   <p className="text-sm text-muted-foreground">{r.fornecedor}</p>
                   <p className="text-xs text-muted-foreground">
@@ -258,7 +289,7 @@ const AgendaPage = () => {
                     {r.horario_agenda && ` às ${r.horario_agenda}`}
                     {r.hora_chegada && ` · Chegou: ${formatTime(r.hora_chegada)}`}
                   </p>
-                  <p className="text-xs text-muted-foreground">Volumes: {r.quantidade_volumes || 0} caixas</p>
+                  {!r.is_pallet && <p className="text-xs text-muted-foreground">Volumes: {r.quantidade_volumes || 0} caixas</p>}
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {r.status === "AGENDADO" && (

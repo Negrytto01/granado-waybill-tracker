@@ -20,10 +20,11 @@ const ArmazenagemPage = () => {
   const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
-    const { data } = await supabase.from("armazenagem").select("*, recebimentos(numero_nf, fornecedor, hora_fim_descarga)")
+    const { data } = await supabase.from("armazenagem").select("*, recebimentos(numero_nf, fornecedor, hora_fim_descarga, is_pallet, quantidade_volumes)")
       .in("status", ["AGUARDANDO ARMAZENAGEM", "EM ARMAZENAGEM"])
       .order("data_criacao", { ascending: true });
-    setItems(data || []);
+    // Filter out pallet-only items
+    setItems((data || []).filter(item => !item.recebimentos?.is_pallet));
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);

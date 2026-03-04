@@ -194,8 +194,11 @@ export type Database = {
           hora_inicio_descarga: string | null
           horario_agenda: string | null
           id: string
+          is_pallet: boolean
           motorista: string | null
+          nfd_numero: string | null
           numero_nf: string
+          observacoes: string | null
           pallets_descarregados: number | null
           placa: string | null
           quantidade_itens: number | null
@@ -221,8 +224,11 @@ export type Database = {
           hora_inicio_descarga?: string | null
           horario_agenda?: string | null
           id?: string
+          is_pallet?: boolean
           motorista?: string | null
+          nfd_numero?: string | null
           numero_nf: string
+          observacoes?: string | null
           pallets_descarregados?: number | null
           placa?: string | null
           quantidade_itens?: number | null
@@ -248,8 +254,11 @@ export type Database = {
           hora_inicio_descarga?: string | null
           horario_agenda?: string | null
           id?: string
+          is_pallet?: boolean
           motorista?: string | null
+          nfd_numero?: string | null
           numero_nf?: string
+          observacoes?: string | null
           pallets_descarregados?: number | null
           placa?: string | null
           quantidade_itens?: number | null
@@ -351,6 +360,7 @@ export type Database = {
         | "FINALIZADO"
         | "ACOPLADO"
         | "DESACOPLADO"
+        | "AGUARDANDO DESACOPLAGEM"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -505,6 +515,7 @@ export const Constants = {
         "FINALIZADO",
         "ACOPLADO",
         "DESACOPLADO",
+        "AGUARDANDO DESACOPLAGEM",
       ],
     },
   },
