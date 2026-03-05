@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getStatusClass, parseXML, formatDate, formatTime } from "@/lib/helpers";
+import { getStatusClass, formatDate, formatTime, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
 import { Plus, Truck, Trash2, Edit, X } from "lucide-react";
@@ -67,7 +67,7 @@ const AgendaPage = () => {
     }
 
     // Consolidate: concatenate NFs, sum non-pallet volumes
-    const concatenatedNFs = validNFs.map(nf => nf.numero_nf).join("/");
+    const concatenatedNFs = validNFs.map(nf => nf.numero_nf).join(" / ");
     const totalVolumes = validNFs.filter(nf => !nf.is_pallet).reduce((sum, nf) => sum + Number(nf.quantidade_volumes), 0);
     const hasPallet = validNFs.some(nf => nf.is_pallet);
 
@@ -198,7 +198,7 @@ const AgendaPage = () => {
                   ))}
                   {nfEntries.length > 1 && (
                     <div className="p-2 rounded border border-primary/20 bg-primary/5 text-xs text-muted-foreground">
-                      <strong>Resumo:</strong> NFs {nfEntries.filter(n => n.numero_nf.trim()).map(n => n.numero_nf).join("/") || "S/N"} — Total Volumes: {nfEntries.filter(n => !n.is_pallet).reduce((s, n) => s + Number(n.quantidade_volumes), 0)}
+                      <strong>Resumo:</strong> NFs {nfEntries.filter(n => n.numero_nf.trim()).map(n => formatNF(n.numero_nf)).join(" / ") || "S/N"} — Total Volumes: {nfEntries.filter(n => !n.is_pallet).reduce((s, n) => s + Number(n.quantidade_volumes), 0)}
                     </div>
                   )}
                 </div>
@@ -249,7 +249,19 @@ const AgendaPage = () => {
               <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-heading text-lg text-foreground">NF {r.numero_nf}</span>
+                     <span className="font-heading text-lg text-foreground">
+                        {r.numero_nf.includes("/") ? (
+                          <span className="flex flex-wrap gap-1.5 items-center">
+                            {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                              <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
+                                NF {formatNF(nf.trim())}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <>NF {formatNF(r.numero_nf)}</>
+                        )}
+                      </span>
                     <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                     {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
                   </div>

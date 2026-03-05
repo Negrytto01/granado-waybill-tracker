@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getStatusClass, formatTime, calcDuration } from "@/lib/helpers";
+import { getStatusClass, formatTime, calcDuration, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playDescargaFinalizada } from "@/lib/sounds";
 import { Play, Truck, Link, Unlink, CheckCircle, MessageSquare } from "lucide-react";
@@ -185,7 +185,19 @@ const DescargaPage = () => {
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-heading text-lg text-foreground">NF {r.numero_nf}</span>
+                      <span className="font-heading text-lg text-foreground">
+                        {r.numero_nf.includes("/") ? (
+                          <span className="flex flex-wrap gap-1.5 items-center">
+                            {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                              <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
+                                NF {formatNF(nf.trim())}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <>NF {formatNF(r.numero_nf)}</>
+                        )}
+                      </span>
                       <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                       {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
                     </div>

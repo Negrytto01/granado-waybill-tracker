@@ -53,6 +53,13 @@ export const formatTime = (date: string | null) => {
   return new Date(date).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
 };
 
+export const formatNF = (nf: string): string => {
+  // Format NF number with dots: 123456 -> 123.456, 1234567 -> 1.234.567
+  const digits = nf.replace(/\D/g, '');
+  if (digits.length === 0) return nf;
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
 export const calcDuration = (start: string | null, end: string | null): string => {
   if (!start) return "-";
   const s = new Date(start).getTime();

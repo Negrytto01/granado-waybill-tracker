@@ -19,6 +19,7 @@ import FornecedoresUrgenciaPage from "@/pages/FornecedoresUrgenciaPage";
 import FluxoFinanceiroPage from "@/pages/FluxoFinanceiroPage";
 import PermissoesPage from "@/pages/PermissoesPage";
 import CalendarioPage from "@/pages/CalendarioPage";
+import SolicitacoesComprasPage from "@/pages/SolicitacoesComprasPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/financeiro" element={<ProtectedRoute><FluxoFinanceiroPage /></ProtectedRoute>} />
             <Route path="/permissoes" element={<ProtectedRoute><PermissoesPage /></ProtectedRoute>} />
             <Route path="/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
+            <Route path="/solicitacoes" element={<ProtectedRoute><SolicitacoesComprasPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

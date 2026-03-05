@@ -180,6 +180,36 @@ export type Database = {
         }
         Relationships: []
       }
+      mensagens_globais: {
+        Row: {
+          data_criacao: string
+          destinatarios: Json
+          enviado_por: string
+          enviado_por_user_id: string
+          id: string
+          lida_por: Json
+          mensagem: string
+        }
+        Insert: {
+          data_criacao?: string
+          destinatarios?: Json
+          enviado_por: string
+          enviado_por_user_id: string
+          id?: string
+          lida_por?: Json
+          mensagem: string
+        }
+        Update: {
+          data_criacao?: string
+          destinatarios?: Json
+          enviado_por?: string
+          enviado_por_user_id?: string
+          id?: string
+          lida_por?: Json
+          mensagem?: string
+        }
+        Relationships: []
+      }
       recebimentos: {
         Row: {
           caixas_batidas: number | null
@@ -270,6 +300,60 @@ export type Database = {
           usuario_responsavel?: string | null
           valor_cobrado?: number | null
           xml_nota?: string | null
+        }
+        Relationships: []
+      }
+      solicitacoes_compras: {
+        Row: {
+          data_aprovacao_compras: string | null
+          data_criacao: string
+          data_resposta: string | null
+          data_sugerida: string | null
+          fornecedor: string
+          horario_sugerido: string | null
+          id: string
+          nf_entries: Json | null
+          observacoes: string | null
+          respondido_por: string | null
+          resposta_observacoes: string | null
+          solicitado_por: string
+          solicitado_por_user_id: string
+          status: string
+          volumes: number | null
+        }
+        Insert: {
+          data_aprovacao_compras?: string | null
+          data_criacao?: string
+          data_resposta?: string | null
+          data_sugerida?: string | null
+          fornecedor: string
+          horario_sugerido?: string | null
+          id?: string
+          nf_entries?: Json | null
+          observacoes?: string | null
+          respondido_por?: string | null
+          resposta_observacoes?: string | null
+          solicitado_por: string
+          solicitado_por_user_id: string
+          status?: string
+          volumes?: number | null
+        }
+        Update: {
+          data_aprovacao_compras?: string | null
+          data_criacao?: string
+          data_resposta?: string | null
+          data_sugerida?: string | null
+          fornecedor?: string
+          horario_sugerido?: string | null
+          id?: string
+          nf_entries?: Json | null
+          observacoes?: string | null
+          respondido_por?: string | null
+          resposta_observacoes?: string | null
+          solicitado_por?: string
+          solicitado_por_user_id?: string
+          status?: string
+          volumes?: number | null
         }
         Relationships: []
       }
