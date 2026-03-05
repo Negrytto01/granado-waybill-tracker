@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate, formatDateTime, formatTime, getStatusClass, calcDuration } from "@/lib/helpers";
+import { formatDate, formatDateTime, formatTime, formatNF, getStatusClass, calcDuration } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -83,7 +83,19 @@ const HistoricoPage = () => {
                 <div className="p-3 flex items-center justify-between cursor-pointer hover:bg-secondary/20" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-heading text-foreground">NF {r.numero_nf}</span>
+                      <span className="font-heading text-foreground">
+                        {r.numero_nf.includes("/") ? (
+                          <span className="flex flex-wrap gap-1 items-center">
+                            {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                              <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">
+                                NF {formatNF(nf.trim())}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <>NF {formatNF(r.numero_nf)}</>
+                        )}
+                      </span>
                       <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{r.fornecedor} · {formatDate(r.data_prevista)} · {r.usuario_responsavel}</p>
@@ -145,6 +157,20 @@ const HistoricoPage = () => {
                         {r.toneladas > 0 && <p className="text-foreground">Toneladas: {r.toneladas}</p>}
                         {r.tipo_descarga && <p className="text-foreground">Tipo: {r.tipo_descarga}</p>}
                         <p className="font-heading text-lg text-primary">Total: R$ {Number(r.valor_cobrado).toFixed(2)}</p>
+                      </div>
+                    )}
+
+                    {r.observacoes && (
+                      <div className="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 space-y-1 text-sm">
+                        <h4 className="font-heading text-sm text-yellow-400">📝 Observações</h4>
+                        <p className="text-foreground">{r.observacoes}</p>
+                      </div>
+                    )}
+
+                    {r.nfd_numero && (
+                      <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 space-y-1 text-sm">
+                        <h4 className="font-heading text-sm text-red-400">📄 NFD (Nota Fiscal de Devolução)</h4>
+                        <p className="text-foreground">{r.nfd_numero}</p>
                       </div>
                     )}
 

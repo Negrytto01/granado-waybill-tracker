@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus, Users, KeyRound } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 
@@ -17,6 +17,9 @@ const UsuariosPage = () => {
   const { profile, signUp } = useAuth();
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
+  const [resetModal, setResetModal] = useState<any>(null);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
   const [form, setForm] = useState({ nome: "", senha: "", confirmarSenha: "", cargo: "Agendamento/Conferente" });
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +44,28 @@ const UsuariosPage = () => {
       fetchData();
     } catch (err: any) {
       toast.error(err.message || "Erro ao criar usuário");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetModal) return;
+    if (!novaSenha || novaSenha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
+    if (novaSenha !== confirmarNovaSenha) { toast.error("Senhas não conferem"); return; }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-password", {
+        body: { user_id: resetModal.user_id, nova_senha: novaSenha },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Senha de ${resetModal.nome} redefinida com sucesso!`);
+      setResetModal(null);
+      setNovaSenha("");
+      setConfirmarNovaSenha("");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao redefinir senha");
     } finally {
       setLoading(false);
     }
@@ -101,6 +126,9 @@ const UsuariosPage = () => {
               <p className="text-xs text-muted-foreground">{u.cargo} · {formatDateTime(u.data_criacao)}</p>
             </div>
             <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => { setResetModal(u); setNovaSenha(""); setConfirmarNovaSenha(""); }} title="Redefinir senha" className="text-muted-foreground hover:text-foreground">
+                <KeyRound className="h-4 w-4" />
+              </Button>
               <span className="text-xs text-muted-foreground">{(u.ativo ?? true) ? "Ativo" : "Inativo"}</span>
               <Switch checked={u.ativo ?? true} onCheckedChange={() => toggleAtivo(u)} />
             </div>
@@ -110,6 +138,21 @@ const UsuariosPage = () => {
           <p className="text-center text-muted-foreground py-8">Nenhum usuário cadastrado</p>
         )}
       </div>
+
+      {/* Reset password modal */}
+      <Dialog open={!!resetModal} onOpenChange={(open) => { if (!open) setResetModal(null); }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Redefinir Senha</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Usuário: <strong className="text-foreground">{resetModal?.nome}</strong></p>
+            <Input type="password" placeholder="Nova senha *" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} className="bg-secondary" />
+            <Input type="password" placeholder="Confirmar nova senha *" value={confirmarNovaSenha} onChange={e => setConfirmarNovaSenha(e.target.value)} className="bg-secondary" />
+            <Button onClick={handleResetPassword} disabled={loading} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
+              {loading ? "Redefinindo..." : "Redefinir Senha"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
