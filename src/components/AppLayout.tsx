@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useCallback } from "react";
+import { ReactNode, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
@@ -6,34 +6,30 @@ import { useNavigate, useLocation } from "react-router-dom";
 import ParticlesBackground from "@/components/ParticlesBackground";
 import Watermark from "@/components/Watermark";
 import GlobalMessageListener from "@/components/GlobalMessageListener";
-import logoGranado from "@/assets/logo-granado.png";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
-  DollarSign, ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell
+  ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell
 } from "lucide-react";
 
 const allNavItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/", page: "dashboard" },
-  { label: "Agenda", icon: CalendarDays, path: "/agenda", page: "agenda" },
   { label: "Calendário", icon: Calendar, path: "/calendario", page: "calendario" },
+  { label: "Agenda", icon: CalendarDays, path: "/agenda", page: "agenda" },
   { label: "Descarga", icon: Truck, path: "/descarga", page: "descarga" },
   { label: "Armazenagem", icon: Package, path: "/armazenagem", page: "armazenagem" },
   { label: "Compras", icon: ShoppingCart, path: "/compras", page: "compras" },
-  { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios" },
-  { label: "Histórico", icon: History, path: "/historico", page: "historico" },
-  { label: "Fornecedores", icon: AlertTriangle, path: "/fornecedores", page: "fornecedores" },
-  { label: "Valores", icon: DollarSign, path: "/valores", page: "valores" },
   { label: "Financeiro", icon: Wallet, path: "/financeiro", page: "financeiro" },
+  { label: "Fornecedores", icon: AlertTriangle, path: "/fornecedores", page: "fornecedores" },
+  { label: "Solicitações", icon: FileText, path: "/solicitacoes", page: "solicitacoes" },
+  { label: "Histórico", icon: History, path: "/historico", page: "historico" },
+  { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios" },
   { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
-  { label: "Permissões", icon: Shield, path: "/permissoes", page: "usuarios" },
-  { label: "Solicitações", icon: FileText, path: "/solicitacoes", page: "compras" },
+  { label: "Permissões", icon: Shield, path: "/permissoes", page: "permissoes" },
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
@@ -44,19 +40,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgText, setMsgText] = useState("");
-  const [msgDestinatarios, setMsgDestinatarios] = useState<string[]>(["todos"]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
 
-  // Auto-logout after 30 min inactivity
   useInactivityTimeout();
-
-  const fetchUsers = useCallback(async () => {
-    if (!isAdmin) return;
-    const { data } = await supabase.from("usuarios").select("nome, user_id").eq("ativo", true);
-    setAllUsers(data || []);
-  }, [isAdmin]);
-
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleSendMsg = async () => {
     if (!msgText.trim()) { toast.error("Digite a mensagem"); return; }
@@ -64,27 +49,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       mensagem: msgText,
       enviado_por: profile?.nome,
       enviado_por_user_id: (await supabase.auth.getUser()).data.user?.id,
-      destinatarios: msgDestinatarios,
+      destinatarios: ["todos"],
     }] as any);
     if (error) { toast.error(error.message); return; }
     toast.success("Mensagem enviada!");
     setMsgOpen(false);
     setMsgText("");
-    setMsgDestinatarios(["todos"]);
-  };
-
-  const toggleDestinatario = (nome: string) => {
-    if (nome === "todos") {
-      setMsgDestinatarios(["todos"]);
-      return;
-    }
-    let updated = msgDestinatarios.filter(d => d !== "todos");
-    if (updated.includes(nome)) {
-      updated = updated.filter(d => d !== nome);
-    } else {
-      updated.push(nome);
-    }
-    setMsgDestinatarios(updated.length === 0 ? ["todos"] : updated);
   };
 
   const filteredNav = allNavItems.filter(item => {
@@ -101,9 +71,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden text-foreground">
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
-        <img src={logoGranado} alt="Granado" className="h-8 w-8 rounded" />
-        <span className="font-heading text-xl neon-text tracking-wider hidden sm:block">GDR</span>
-        <span className="text-muted-foreground text-xs hidden sm:block">Granado Distribuidora</span>
+        <img src="/logo-granado-icon.png" alt="Granado" className="h-8 w-8 rounded" />
+        <span className="font-heading text-lg neon-text tracking-wider hidden sm:block">Granado Distribuidora</span>
         <div className="ml-auto flex items-center gap-3">
           {isAdmin && (
             <Button variant="ghost" size="icon" onClick={() => setMsgOpen(true)} title="Enviar mensagem global">
@@ -167,33 +136,13 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
       <GlobalMessageListener />
 
-      {/* Send global message modal */}
       <Dialog open={msgOpen} onOpenChange={setMsgOpen}>
-        <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Enviar Mensagem Global</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <Textarea placeholder="Digite sua mensagem..." value={msgText} onChange={e => setMsgText(e.target.value)} className="bg-secondary" rows={3} />
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">Destinatários</label>
-              <div className="flex flex-wrap gap-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox checked={msgDestinatarios.includes("todos")} onCheckedChange={() => toggleDestinatario("todos")} />
-                  <span className="text-sm text-foreground">Todos</span>
-                </label>
-                {allUsers.map(u => (
-                  <label key={u.user_id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox 
-                      checked={msgDestinatarios.includes(u.nome)} 
-                      onCheckedChange={() => toggleDestinatario(u.nome)}
-                      disabled={msgDestinatarios.includes("todos")}
-                    />
-                    <span className="text-sm text-foreground">{u.nome}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <Textarea placeholder="Digite sua mensagem para todos os usuários..." value={msgText} onChange={e => setMsgText(e.target.value)} className="bg-secondary" rows={3} />
             <Button onClick={handleSendMsg} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
-              <Send className="mr-2 h-4 w-4" /> Enviar Mensagem
+              <Send className="mr-2 h-4 w-4" /> Enviar para Todos
             </Button>
           </div>
         </DialogContent>

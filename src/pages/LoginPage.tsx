@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ParticlesBackground from "@/components/ParticlesBackground";
-import logoGdr from "@/assets/logo-gdr.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LogIn, UserPlus } from "lucide-react";
@@ -72,8 +71,8 @@ const LoginPage = () => {
       {isFirstUser ? (
         <form onSubmit={handleFirstUser} className="relative z-10 w-full max-w-sm mx-4 p-8 rounded-xl border border-border bg-card/80 backdrop-blur-md space-y-6">
           <div className="flex flex-col items-center gap-3">
-            <img src={logoGdr} alt="GDR Logo" className="w-24 h-24 rounded-lg" />
-            <h1 className="font-heading text-3xl neon-text tracking-wider">Primeiro Acesso</h1>
+            <img src="/logo-granado-icon.png" alt="Granado Distribuidora" className="w-24 h-24 rounded-lg" />
+            <h1 className="font-heading text-2xl neon-text tracking-wider">Granado Distribuidora</h1>
             <p className="text-muted-foreground text-sm text-center">Crie o primeiro usuário administrador</p>
           </div>
           <div className="space-y-4">
@@ -88,9 +87,9 @@ const LoginPage = () => {
       ) : (
         <form onSubmit={handleLogin} className="relative z-10 w-full max-w-sm mx-4 p-8 rounded-xl border border-border bg-card/80 backdrop-blur-md space-y-6">
           <div className="flex flex-col items-center gap-3">
-            <img src={logoGdr} alt="GDR Logo" className="w-24 h-24 rounded-lg" />
-            <h1 className="font-heading text-3xl neon-text tracking-wider">GDR</h1>
-            <p className="text-muted-foreground text-sm">Granado Distribuidora — Recebimento</p>
+            <img src="/logo-granado-icon.png" alt="Granado Distribuidora" className="w-24 h-24 rounded-lg" />
+            <h1 className="font-heading text-2xl neon-text tracking-wider">Granado Distribuidora</h1>
+            <p className="text-muted-foreground text-sm">Sistema de Agendamento e Recebimento</p>
           </div>
           <div className="space-y-4">
             <Input placeholder="Nome do Usuário" value={nome} onChange={e => setNome(e.target.value)} className="bg-secondary border-border" />

@@ -20,6 +20,8 @@ export type Database = {
           hora_fim: string | null
           hora_inicio: string | null
           id: string
+          observacoes_armazenagem: string | null
+          pausas: Json | null
           quantidade_itens: number | null
           quantidade_volumes: number | null
           recebimento_id: string
@@ -31,6 +33,8 @@ export type Database = {
           hora_fim?: string | null
           hora_inicio?: string | null
           id?: string
+          observacoes_armazenagem?: string | null
+          pausas?: Json | null
           quantidade_itens?: number | null
           quantidade_volumes?: number | null
           recebimento_id: string
@@ -42,6 +46,8 @@ export type Database = {
           hora_fim?: string | null
           hora_inicio?: string | null
           id?: string
+          observacoes_armazenagem?: string | null
+          pausas?: Json | null
           quantidade_itens?: number | null
           quantidade_volumes?: number | null
           recebimento_id?: string
@@ -225,6 +231,7 @@ export type Database = {
           horario_agenda: string | null
           id: string
           is_pallet: boolean
+          is_retirada: boolean
           motorista: string | null
           nfd_numero: string | null
           numero_nf: string
@@ -255,6 +262,7 @@ export type Database = {
           horario_agenda?: string | null
           id?: string
           is_pallet?: boolean
+          is_retirada?: boolean
           motorista?: string | null
           nfd_numero?: string | null
           numero_nf: string
@@ -285,6 +293,7 @@ export type Database = {
           horario_agenda?: string | null
           id?: string
           is_pallet?: boolean
+          is_retirada?: boolean
           motorista?: string | null
           nfd_numero?: string | null
           numero_nf?: string
@@ -423,6 +432,7 @@ export type Database = {
         | "AGUARDANDO ARMAZENAGEM"
         | "EM ARMAZENAGEM"
         | "FINALIZADO"
+        | "PAUSADO"
       cargo_tipo:
         | "Administrador"
         | "Recebimento"
@@ -576,6 +586,7 @@ export const Constants = {
         "AGUARDANDO ARMAZENAGEM",
         "EM ARMAZENAGEM",
         "FINALIZADO",
+        "PAUSADO",
       ],
       cargo_tipo: [
         "Administrador",

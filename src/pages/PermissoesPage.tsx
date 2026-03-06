@@ -18,6 +18,7 @@ const allPages = [
   { key: "valores", label: "Valores Descarga" },
   { key: "usuarios", label: "Usuários" },
   { key: "calendario", label: "Calendário" },
+  { key: "solicitacoes", label: "Solicitações" },
 ];
 
 const cargos = ["Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal"];
