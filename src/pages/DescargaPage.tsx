@@ -4,19 +4,29 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getStatusClass, formatTime, calcDuration, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playDescargaFinalizada } from "@/lib/sounds";
-import { Play, Truck, Link, Unlink, CheckCircle, MessageSquare } from "lucide-react";
+import { Play, Truck, Link, Unlink, CheckCircle, MessageSquare, Plus, X, ClipboardCheck } from "lucide-react";
+
+interface NFVerification {
+  nf: string;
+  arrived: boolean;
+}
 
 const DescargaPage = () => {
   const { profile } = useAuth();
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
   const [finalizarModal, setFinalizarModal] = useState<any>(null);
   const [desacoplarModal, setDesacoplarModal] = useState<any>(null);
+  const [verificacaoModal, setVerificacaoModal] = useState<any>(null);
+  const [nfVerifications, setNfVerifications] = useState<NFVerification[]>([]);
+  const [extraNFs, setExtraNFs] = useState<string[]>([]);
+  const [newExtraNF, setNewExtraNF] = useState("");
   const [caixasBatidas, setCaixasBatidas] = useState("");
   const [palletsDescarregados, setPalletsDescarregados] = useState("");
   const [toneladas, setToneladas] = useState("");
@@ -31,7 +41,6 @@ const DescargaPage = () => {
       .in("status", ["CHEGOU", "ACOPLADO", "EM DESCARGA", "AGUARDANDO DESACOPLAGEM"])
       .order("hora_chegada", { ascending: true });
     setRecebimentos(data || []);
-
     const { data: val } = await supabase.from("valores_descarga").select("*").limit(1);
     if (val && val.length > 0) {
       setValoresConfig({
@@ -52,7 +61,6 @@ const DescargaPage = () => {
     return () => clearInterval(i);
   }, [recebimentos]);
 
-  // NOVO FLUXO: Acoplar → Iniciar Descarga → Finalizar Descarga → Desacoplar
   const acoplar = async (id: string) => {
     await supabase.from("recebimentos").update({
       status: "ACOPLADO" as any,
@@ -62,13 +70,44 @@ const DescargaPage = () => {
     toast.success("Caminhão acoplado!");
   };
 
-  const iniciarDescarga = async (id: string) => {
+  const openVerificacao = (r: any) => {
+    const nfs = r.numero_nf.split(/\s*\/\s*/).map((nf: string) => nf.trim()).filter(Boolean);
+    setNfVerifications(nfs.map((nf: string) => ({ nf, arrived: true })));
+    setExtraNFs([]);
+    setNewExtraNF("");
+    setVerificacaoModal(r);
+  };
+
+  const confirmarVerificacao = async () => {
+    if (!verificacaoModal) return;
+    const notArrived = nfVerifications.filter(v => !v.arrived).map(v => v.nf);
+    const obsArray: string[] = [];
+
+    if (notArrived.length > 0) {
+      obsArray.push(`NFs não chegaram conforme agendamento: ${notArrived.map(nf => formatNF(nf)).join(", ")}`);
+    }
+
+    let updatedNFs = verificacaoModal.numero_nf;
+    if (extraNFs.length > 0) {
+      updatedNFs = updatedNFs + " / " + extraNFs.join(" / ");
+      obsArray.push(`NFs adicionadas sem agendamento prévio: ${extraNFs.map(nf => formatNF(nf)).join(", ")}`);
+    }
+
+    const existingObs = verificacaoModal.observacoes || "";
+    const newObs = obsArray.length > 0
+      ? (existingObs ? existingObs + " | " : "") + obsArray.join(" | ")
+      : existingObs;
+
     await supabase.from("recebimentos").update({
       status: "EM DESCARGA" as any,
       hora_inicio_descarga: new Date().toISOString(),
-      usuario_responsavel: profile?.nome
-    }).eq("id", id);
+      usuario_responsavel: profile?.nome,
+      numero_nf: updatedNFs,
+      observacoes: newObs || null,
+    }).eq("id", verificacaoModal.id);
+
     toast.success("Descarga iniciada!");
+    setVerificacaoModal(null);
   };
 
   const openFinalizarModal = (r: any) => {
@@ -99,10 +138,9 @@ const DescargaPage = () => {
     const ton = parseFloat(toneladas) || 0;
     const valorTotal = calcValorTotal();
 
-    const now = new Date().toISOString();
     await supabase.from("recebimentos").update({
       status: "AGUARDANDO DESACOPLAGEM" as any,
-      hora_fim_descarga: now,
+      hora_fim_descarga: new Date().toISOString(),
       caixas_batidas: caixas,
       pallets_descarregados: pallets,
       toneladas: ton,
@@ -112,7 +150,6 @@ const DescargaPage = () => {
       nfd_numero: nfdNumero || null,
     }).eq("id", finalizarModal.id);
 
-    // Só cria armazenagem se NÃO for pallet
     if (!finalizarModal.is_pallet) {
       await supabase.from("armazenagem").insert([{
         recebimento_id: finalizarModal.id,
@@ -129,17 +166,13 @@ const DescargaPage = () => {
         descricao: `Descarga NF ${finalizarModal.numero_nf} - ${finalizarModal.fornecedor}`,
         valor: valorTotal,
         recebimento_id: finalizarModal.id,
-        criado_por: "Sistema",
-      }]);
+        criado_por: profile?.nome,
+      }] as any);
     }
 
     playDescargaFinalizada();
     toast.success(valorTotal > 0 ? `Descarga finalizada! Valor: R$ ${valorTotal.toFixed(2)}` : "Descarga finalizada!");
     setFinalizarModal(null);
-  };
-
-  const openDesacoplarModal = (r: any) => {
-    setDesacoplarModal(r);
   };
 
   const desacoplar = async () => {
@@ -159,14 +192,6 @@ const DescargaPage = () => {
     toast.success("Removido!");
   };
 
-  const getNextAction = (status: string) => {
-    switch (status) {
-      case "CHEGOU": return { label: "Acoplar", icon: Link, action: acoplar, color: "bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30" };
-      case "ACOPLADO": return { label: "Iniciar Descarga", icon: Play, action: iniciarDescarga, color: "bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30" };
-      default: return null;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl neon-text">Controle de Descarga</h1>
@@ -178,74 +203,119 @@ const DescargaPage = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {recebimentos.map(r => {
-            const nextAction = getNextAction(r.status);
-            return (
-              <div key={r.id} className="p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-heading text-lg text-foreground">
-                        {r.numero_nf.includes("/") ? (
-                          <span className="flex flex-wrap gap-1.5 items-center">
-                            {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
-                              <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
-                                NF {formatNF(nf.trim())}
-                              </span>
-                            ))}
-                          </span>
-                        ) : (
-                          <>NF {formatNF(r.numero_nf)}</>
-                        )}
-                      </span>
-                      <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
-                      {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{r.fornecedor}</p>
-                    {r.observacoes && (
-                      <p className="text-xs text-yellow-400 flex items-center gap-1 mt-1">
-                        <MessageSquare className="h-3 w-3" /> {r.observacoes}
-                      </p>
-                    )}
-                    {r.nfd_numero && (
-                      <p className="text-xs text-red-400 mt-1">NFD: {r.nfd_numero}</p>
-                    )}
+          {recebimentos.map(r => (
+            <div key={r.id} className="p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-heading text-lg text-foreground">
+                      {r.numero_nf.includes("/") ? (
+                        <span className="flex flex-wrap gap-1.5 items-center">
+                          {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                            <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
+                              NF {formatNF(nf.trim())}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <>NF {formatNF(r.numero_nf)}</>
+                      )}
+                    </span>
+                    <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                    {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
                   </div>
-                  {isAdmin && (
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(r.id)} className="text-destructive hover:text-destructive">Remover</Button>
+                  <p className="text-sm text-muted-foreground">{r.fornecedor}</p>
+                  {r.observacoes && (
+                    <p className="text-xs text-yellow-400 flex items-center gap-1 mt-1">
+                      <MessageSquare className="h-3 w-3" /> {r.observacoes}
+                    </p>
                   )}
+                  {r.nfd_numero && <p className="text-xs text-red-400 mt-1">NFD: {formatNF(r.nfd_numero)}</p>}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                  <div><span className="text-muted-foreground">Chegada:</span> <span className="text-foreground">{formatTime(r.hora_chegada)}</span></div>
-                  {r.hora_acoplagem && <div><span className="text-muted-foreground">Acoplou:</span> <span className="text-foreground">{formatTime(r.hora_acoplagem)}</span></div>}
-                  {r.hora_inicio_descarga && <div><span className="text-muted-foreground">Início:</span> <span className="text-foreground">{formatTime(r.hora_inicio_descarga)}</span></div>}
-                  {r.status === "EM DESCARGA" && <div><span className="text-muted-foreground">Tempo:</span> <span className="text-primary animate-pulse">{calcDuration(r.hora_inicio_descarga, null)}</span></div>}
-                  {r.hora_fim_descarga && <div><span className="text-muted-foreground">Fim:</span> <span className="text-foreground">{formatTime(r.hora_fim_descarga)}</span></div>}
-                  {r.hora_desacoplagem && <div><span className="text-muted-foreground">Saída:</span> <span className="text-foreground">{formatTime(r.hora_desacoplagem)}</span></div>}
-                  <div><span className="text-muted-foreground">Resp:</span> <span className="text-foreground">{r.usuario_responsavel}</span></div>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {nextAction && (
-                    <Button size="sm" onClick={() => nextAction.action(r.id)} className={nextAction.color}>
-                      <nextAction.icon className="mr-2 h-4 w-4" /> {nextAction.label}
-                    </Button>
-                  )}
-                  {r.status === "EM DESCARGA" && (
-                    <Button size="sm" onClick={() => openFinalizarModal(r)} className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30">
-                      <CheckCircle className="mr-2 h-4 w-4" /> Finalizar Descarga
-                    </Button>
-                  )}
-                  {r.status === "AGUARDANDO DESACOPLAGEM" && (
-                    <Button size="sm" onClick={() => openDesacoplarModal(r)} className="bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30">
-                      <Unlink className="mr-2 h-4 w-4" /> Desacoplar (Saída)
-                    </Button>
-                  )}
-                </div>
+                {isAdmin && (
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(r.id)} className="text-destructive hover:text-destructive">Remover</Button>
+                )}
               </div>
-            );
-          })}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Chegada:</span> <span className="text-foreground">{formatTime(r.hora_chegada)}</span></div>
+                {r.hora_acoplagem && <div><span className="text-muted-foreground">Acoplou:</span> <span className="text-foreground">{formatTime(r.hora_acoplagem)}</span></div>}
+                {r.hora_inicio_descarga && <div><span className="text-muted-foreground">Início:</span> <span className="text-foreground">{formatTime(r.hora_inicio_descarga)}</span></div>}
+                {r.status === "EM DESCARGA" && <div><span className="text-muted-foreground">Tempo:</span> <span className="text-primary animate-pulse">{calcDuration(r.hora_inicio_descarga, null)}</span></div>}
+                {r.hora_fim_descarga && <div><span className="text-muted-foreground">Fim:</span> <span className="text-foreground">{formatTime(r.hora_fim_descarga)}</span></div>}
+                <div><span className="text-muted-foreground">Resp:</span> <span className="text-foreground">{r.usuario_responsavel}</span></div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {r.status === "CHEGOU" && (
+                  <Button size="sm" onClick={() => acoplar(r.id)} className="bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30">
+                    <Link className="mr-2 h-4 w-4" /> Acoplar
+                  </Button>
+                )}
+                {r.status === "ACOPLADO" && (
+                  <Button size="sm" onClick={() => openVerificacao(r)} className="bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30">
+                    <ClipboardCheck className="mr-2 h-4 w-4" /> Verificar NFs e Iniciar Descarga
+                  </Button>
+                )}
+                {r.status === "EM DESCARGA" && (
+                  <Button size="sm" onClick={() => openFinalizarModal(r)} className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30">
+                    <CheckCircle className="mr-2 h-4 w-4" /> Finalizar Descarga
+                  </Button>
+                )}
+                {r.status === "AGUARDANDO DESACOPLAGEM" && (
+                  <Button size="sm" onClick={() => setDesacoplarModal(r)} className="bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30">
+                    <Unlink className="mr-2 h-4 w-4" /> Desacoplar (Saída)
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
+
+      {/* NF Verification modal */}
+      <Dialog open={!!verificacaoModal} onOpenChange={(open) => !open && setVerificacaoModal(null)}>
+        <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Verificação de NFs — Iniciar Descarga</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">{verificacaoModal?.fornecedor}</p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">NFs Agendadas — marque as que chegaram:</label>
+              {nfVerifications.map((v, i) => (
+                <div key={i} className="flex items-center gap-3 p-2 rounded-lg border border-border bg-secondary/30">
+                  <Checkbox checked={v.arrived} onCheckedChange={(checked) => {
+                    const updated = [...nfVerifications];
+                    updated[i].arrived = !!checked;
+                    setNfVerifications(updated);
+                  }} />
+                  <span className={`text-sm ${v.arrived ? "text-foreground" : "text-red-400 line-through"}`}>
+                    NF {formatNF(v.nf)}
+                  </span>
+                  {!v.arrived && <span className="text-xs text-red-400">Não chegou</span>}
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">NFs extras (não agendadas):</label>
+              {extraNFs.map((nf, i) => (
+                <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
+                  <span className="text-sm text-yellow-400">NF {formatNF(nf)} (sem agendamento)</span>
+                  <Button size="sm" variant="ghost" onClick={() => setExtraNFs(extraNFs.filter((_, idx) => idx !== i))} className="text-destructive ml-auto">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input placeholder="Número NF extra" inputMode="numeric" value={newExtraNF} onChange={e => setNewExtraNF(e.target.value)} className="bg-secondary" />
+                <Button size="sm" variant="outline" onClick={() => { if (newExtraNF.trim()) { setExtraNFs([...extraNFs, newExtraNF.trim()]); setNewExtraNF(""); } }} className="border-yellow-500/50 text-yellow-400">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <Button onClick={confirmarVerificacao} className="w-full bg-orange-600 text-white hover:bg-orange-700">
+              <Play className="mr-2 h-4 w-4" /> Confirmar e Iniciar Descarga
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Finalizar modal */}
       <Dialog open={!!finalizarModal} onOpenChange={(open) => !open && setFinalizarModal(null)}>
@@ -253,31 +323,15 @@ const DescargaPage = () => {
           <DialogHeader><DialogTitle className="font-heading neon-text">Finalizar Descarga</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">NF {finalizarModal?.numero_nf} — {finalizarModal?.fornecedor}</p>
-
             <div>
               <label className="text-sm text-muted-foreground">Observações</label>
-              <Textarea
-                value={observacoes}
-                onChange={e => setObservacoes(e.target.value)}
-                className="bg-secondary mt-1"
-                placeholder="Ex: Shelf life, mercadoria danificada, aguardando autorização..."
-                rows={3}
-              />
+              <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} className="bg-secondary mt-1" placeholder="Ex: Shelf life, mercadoria danificada..." rows={3} />
             </div>
-
             <div>
               <label className="text-sm text-muted-foreground">NFD (Nota Fiscal de Devolução)</label>
-              <Input
-                value={nfdNumero}
-                onChange={e => setNfdNumero(e.target.value)}
-                className="bg-secondary mt-1"
-                placeholder="Número da NFD (se houver)"
-                inputMode="numeric"
-              />
+              <Input value={nfdNumero} onChange={e => setNfdNumero(e.target.value)} className="bg-secondary mt-1" placeholder="Número da NFD (se houver)" inputMode="numeric" />
             </div>
-
             <p className="text-xs text-muted-foreground italic">Os campos de cobrança abaixo são opcionais.</p>
-
             <div>
               <label className="text-sm text-muted-foreground">Tipo de Descarga</label>
               <Select value={tipoDescarga} onValueChange={setTipoDescarga}>
@@ -291,7 +345,6 @@ const DescargaPage = () => {
                 </SelectContent>
               </Select>
             </div>
-
             {(tipoDescarga === "caixa" || tipoDescarga === "misto") && (
               <div>
                 <label className="text-sm text-muted-foreground">Caixas Batidas</label>
@@ -299,7 +352,6 @@ const DescargaPage = () => {
                 <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_caixa.toFixed(2)}</p>
               </div>
             )}
-
             {(tipoDescarga === "pallet" || tipoDescarga === "misto") && (
               <div>
                 <label className="text-sm text-muted-foreground">Pallets Descarregados</label>
@@ -307,7 +359,6 @@ const DescargaPage = () => {
                 <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_pallet.toFixed(2)}</p>
               </div>
             )}
-
             {tipoDescarga === "tonelada" && (
               <div>
                 <label className="text-sm text-muted-foreground">Toneladas</label>
@@ -315,14 +366,12 @@ const DescargaPage = () => {
                 <p className="text-xs text-muted-foreground mt-1">Valor unitário: R$ {valoresConfig.valor_por_tonelada.toFixed(2)}</p>
               </div>
             )}
-
             {tipoDescarga !== "nenhum" && (
               <div className="p-3 rounded-lg border border-primary/30 bg-primary/10">
                 <p className="text-sm text-muted-foreground">Valor Total Cobrado:</p>
                 <p className="font-heading text-2xl text-primary">R$ {calcValorTotal().toFixed(2)}</p>
               </div>
             )}
-
             <Button onClick={finalizarDescarga} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
               <CheckCircle className="mr-2 h-4 w-4" /> Confirmar Finalização
             </Button>

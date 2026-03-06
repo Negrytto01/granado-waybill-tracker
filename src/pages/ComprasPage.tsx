@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDate, formatTime, getStatusClass } from "@/lib/helpers";
+import { formatDate, formatTime, formatNF, getStatusClass } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { CalendarDays } from "lucide-react";
 
@@ -39,16 +39,30 @@ const ComprasPage = () => {
             {group.items.map(r => (
               <div key={r.id} className="p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-heading text-lg text-foreground">NF {r.numero_nf}</span>
+                  <span className="font-heading text-lg text-foreground">
+                    {r.numero_nf.includes("/") ? (
+                      <span className="flex flex-wrap gap-1.5 items-center">
+                        {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                          <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
+                            NF {formatNF(nf.trim())}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <>NF {formatNF(r.numero_nf)}</>
+                    )}
+                  </span>
                   <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                  {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
+                  {r.is_retirada && <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">RETIRADA</span>}
                 </div>
                 <p className="text-sm text-muted-foreground">{r.fornecedor}</p>
                 <p className="text-xs text-muted-foreground">
                   Previsto: {formatDate(r.data_prevista)}
-                  {r.horario_agenda && ` às ${r.horario_agenda}`}
+                  {r.horario_agenda && ` às ${r.horario_agenda.substring(0, 5)}`}
                   {r.hora_chegada && ` · Chegou: ${formatTime(r.hora_chegada)}`}
                 </p>
-                <p className="text-xs text-muted-foreground">Volumes: {r.quantidade_volumes || 0}</p>
+                {!r.is_pallet && <p className="text-xs text-muted-foreground">Volumes: {r.quantidade_volumes || 0}</p>}
               </div>
             ))}
           </div>

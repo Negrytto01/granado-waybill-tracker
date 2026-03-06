@@ -30,7 +30,9 @@ export const usePermissions = () => {
       .channel("realtime-cargo_permissoes")
       .on("postgres_changes", { event: "*", schema: "public", table: "cargo_permissoes" }, () => fetchPermissoes())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Polling every 30s as backup for realtime sync across devices
+    const interval = setInterval(fetchPermissoes, 30000);
+    return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, [fetchPermissoes]);
 
   const isAdmin = profile?.cargo === "Master";
@@ -44,7 +46,7 @@ export const usePermissions = () => {
 
   const getAccessiblePages = useCallback((): string[] => {
     if (!profile) return [];
-    if (isAdmin) return ["dashboard", "agenda", "descarga", "armazenagem", "relatorios", "historico", "usuarios", "valores", "compras", "fornecedores", "financeiro", "calendario"];
+    if (isAdmin) return ["dashboard", "agenda", "descarga", "armazenagem", "relatorios", "historico", "usuarios", "valores", "compras", "fornecedores", "financeiro", "calendario", "solicitacoes"];
     return permissoes
       .filter(p => p.cargo === profile.cargo && p.ativo)
       .map(p => p.pagina);

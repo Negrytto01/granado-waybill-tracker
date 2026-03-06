@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { getStatusClass, formatDate, formatTime, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Truck, Trash2, Edit, X } from "lucide-react";
+import { Plus, Truck, Trash2, Edit, X, PackagePlus } from "lucide-react";
 
 interface NFEntry {
   numero_nf: string;
@@ -22,9 +22,14 @@ const AgendaPage = () => {
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
+  const [addNfModal, setAddNfModal] = useState<any>(null);
+  const [addNfType, setAddNfType] = useState<"pallet" | "regular">("pallet");
+  const [newNfNumber, setNewNfNumber] = useState("");
+  const [newNfVolumes, setNewNfVolumes] = useState("");
   const [fornecedor, setFornecedor] = useState("");
   const [dataPrevista, setDataPrevista] = useState(new Date().toISOString().split("T")[0]);
   const [horarioAgenda, setHorarioAgenda] = useState("");
+  const [isRetirada, setIsRetirada] = useState(false);
   const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
   const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "", is_pallet: false });
   const isAdmin = profile?.cargo === "Master";
@@ -49,6 +54,7 @@ const AgendaPage = () => {
     setFornecedor("");
     setDataPrevista(new Date().toISOString().split("T")[0]);
     setHorarioAgenda("");
+    setIsRetirada(false);
     setNfEntries([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
   };
 
@@ -65,8 +71,6 @@ const AgendaPage = () => {
     if (validNFs.length === 0) {
       validNFs.push({ numero_nf: "S/N", quantidade_volumes: 0, is_pallet: false });
     }
-
-    // Consolidate: concatenate NFs, sum non-pallet volumes
     const concatenatedNFs = validNFs.map(nf => nf.numero_nf).join(" / ");
     const totalVolumes = validNFs.filter(nf => !nf.is_pallet).reduce((sum, nf) => sum + Number(nf.quantidade_volumes), 0);
     const hasPallet = validNFs.some(nf => nf.is_pallet);
@@ -80,7 +84,8 @@ const AgendaPage = () => {
       usuario_responsavel: profile?.nome,
       status: "AGENDADO" as any,
       is_pallet: hasPallet,
-    }]);
+      is_retirada: isRetirada,
+    }] as any);
     if (error) { toast.error(error.message); return; }
     toast.success("Agendamento salvo!");
     setOpenNew(false);
@@ -121,15 +126,47 @@ const AgendaPage = () => {
     setEditItem(r);
   };
 
+  const handleAddNf = async () => {
+    if (!addNfModal || !newNfNumber.trim()) { toast.error("Informe o número da NF"); return; }
+    const currentNFs = addNfModal.numero_nf;
+    const updatedNFs = currentNFs ? `${currentNFs} / ${newNfNumber.trim()}` : newNfNumber.trim();
+    const volumes = addNfType === "pallet" ? addNfModal.quantidade_volumes : (addNfModal.quantidade_volumes || 0) + (parseInt(newNfVolumes) || 0);
 
-  const handleChegou = async (id: string) => {
-    await supabase.from("recebimentos").update({
-      status: "CHEGOU" as any,
-      hora_chegada: new Date().toISOString(),
-      usuario_responsavel: profile?.nome,
-    }).eq("id", id);
-    playTruckArrival();
-    toast.success("Chegada registrada!");
+    const { error } = await supabase.from("recebimentos").update({
+      numero_nf: updatedNFs,
+      quantidade_volumes: volumes,
+      is_pallet: addNfType === "pallet" ? true : addNfModal.is_pallet,
+    }).eq("id", addNfModal.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`NF ${addNfType === "pallet" ? "de Pallet" : ""} adicionada!`);
+    setAddNfModal(null);
+    setNewNfNumber("");
+    setNewNfVolumes("");
+  };
+
+  const handleChegou = async (r: any) => {
+    if (r.is_retirada) {
+      await supabase.from("recebimentos").update({
+        status: "AGUARDANDO ARMAZENAGEM" as any,
+        hora_chegada: new Date().toISOString(),
+        usuario_responsavel: profile?.nome,
+      }).eq("id", r.id);
+      await supabase.from("armazenagem").insert([{
+        recebimento_id: r.id,
+        quantidade_itens: r.quantidade_itens || 0,
+        quantidade_volumes: r.quantidade_volumes || 0,
+        status: "AGUARDANDO ARMAZENAGEM" as any,
+      }]);
+      toast.success("Retirada registrada! Enviado para armazenagem.");
+    } else {
+      await supabase.from("recebimentos").update({
+        status: "CHEGOU" as any,
+        hora_chegada: new Date().toISOString(),
+        usuario_responsavel: profile?.nome,
+      }).eq("id", r.id);
+      playTruckArrival();
+      toast.success("Chegada registrada!");
+    }
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -146,68 +183,67 @@ const AgendaPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="font-heading text-3xl neon-text">Agenda de Recebimento</h1>
-        <div className="flex gap-2">
-          <Dialog open={openNew} onOpenChange={(open) => { setOpenNew(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/80">
-                <Plus className="mr-2 h-4 w-4" /> Nova NF
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle className="font-heading neon-text">Novo Recebimento</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <Input placeholder="Fornecedor" value={fornecedor} onChange={e => setFornecedor(e.target.value)} className="bg-secondary" />
-                <div>
-                  <label className="text-xs text-muted-foreground">Data da Agenda</label>
-                  <Input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)} className="bg-secondary mt-1" />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Horário da Agenda</label>
-                  <Input type="time" value={horarioAgenda} onChange={e => setHorarioAgenda(e.target.value)} className="bg-secondary mt-1" />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
-                    <Button type="button" variant="outline" size="sm" onClick={addNfEntry} className="text-xs border-primary/50 text-primary">
-                      <Plus className="h-3 w-3 mr-1" /> Adicionar NF
-                    </Button>
-                  </div>
-                  {nfEntries.map((nf, i) => (
-                    <div key={i} className="flex gap-2 items-start">
-                      <div className="flex-1 space-y-1">
-                        <Input placeholder={`Número NF ${i + 1}`} inputMode="numeric" value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
-                        <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
-                        <div className="flex items-center gap-2 py-1">
-                          <Checkbox
-                            id={`pallet-${i}`}
-                            checked={nf.is_pallet}
-                            onCheckedChange={(checked) => updateNfEntry(i, "is_pallet", !!checked)}
-                          />
-                          <label htmlFor={`pallet-${i}`} className="text-xs text-muted-foreground cursor-pointer">
-                            NF de Pallet (não contabiliza volumes/armazenagem)
-                          </label>
-                        </div>
-                      </div>
-                      {nfEntries.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {nfEntries.length > 1 && (
-                    <div className="p-2 rounded border border-primary/20 bg-primary/5 text-xs text-muted-foreground">
-                      <strong>Resumo:</strong> NFs {nfEntries.filter(n => n.numero_nf.trim()).map(n => formatNF(n.numero_nf)).join(" / ") || "S/N"} — Total Volumes: {nfEntries.filter(n => !n.is_pallet).reduce((s, n) => s + Number(n.quantidade_volumes), 0)}
-                    </div>
-                  )}
-                </div>
-
-                <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
+        <Dialog open={openNew} onOpenChange={(open) => { setOpenNew(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/80">
+              <Plus className="mr-2 h-4 w-4" /> Nova NF
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle className="font-heading neon-text">Novo Recebimento</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Input placeholder="Fornecedor" value={fornecedor} onChange={e => setFornecedor(e.target.value)} className="bg-secondary" />
+              <div>
+                <label className="text-xs text-muted-foreground">Data da Agenda</label>
+                <Input type="date" value={dataPrevista} onChange={e => setDataPrevista(e.target.value)} className="bg-secondary mt-1" />
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Horário da Agenda</label>
+                <Input type="time" value={horarioAgenda} onChange={e => setHorarioAgenda(e.target.value)} className="bg-secondary mt-1" />
+              </div>
+
+              <div className="flex items-center gap-2 p-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5">
+                <Checkbox id="retirada" checked={isRetirada} onCheckedChange={(checked) => setIsRetirada(!!checked)} />
+                <label htmlFor="retirada" className="text-sm text-cyan-400 cursor-pointer font-medium">
+                  Retirada Granado (pula descarga, vai direto para armazenagem)
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
+                  <Button type="button" variant="outline" size="sm" onClick={addNfEntry} className="text-xs border-primary/50 text-primary">
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar NF
+                  </Button>
+                </div>
+                {nfEntries.map((nf, i) => (
+                  <div key={i} className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-1">
+                      <Input placeholder={`Número NF ${i + 1}`} inputMode="numeric" value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
+                      <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
+                      <div className="flex items-center gap-2 py-1">
+                        <Checkbox id={`pallet-${i}`} checked={nf.is_pallet} onCheckedChange={(checked) => updateNfEntry(i, "is_pallet", !!checked)} />
+                        <label htmlFor={`pallet-${i}`} className="text-xs text-muted-foreground cursor-pointer">NF de Pallet (não contabiliza volumes/armazenagem)</label>
+                      </div>
+                    </div>
+                    {nfEntries.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {nfEntries.length > 1 && (
+                  <div className="p-2 rounded border border-primary/20 bg-primary/5 text-xs text-muted-foreground">
+                    <strong>Resumo:</strong> NFs {nfEntries.filter(n => n.numero_nf.trim()).map(n => formatNF(n.numero_nf)).join(" / ") || "S/N"} — Total Volumes: {nfEntries.filter(n => !n.is_pallet).reduce((s, n) => s + Number(n.quantidade_volumes), 0)}
+                  </div>
+                )}
+              </div>
+
+              <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Edit dialog */}
@@ -219,14 +255,8 @@ const AgendaPage = () => {
             <Input placeholder="Fornecedor" value={editForm.fornecedor} onChange={e => setEditForm({...editForm, fornecedor: e.target.value})} className="bg-secondary" />
             <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={editForm.quantidade_volumes || ""} onChange={e => setEditForm({...editForm, quantidade_volumes: Number(e.target.value)})} className="bg-secondary" />
             <div className="flex items-center gap-2 py-1">
-              <Checkbox
-                id="edit-pallet"
-                checked={editForm.is_pallet}
-                onCheckedChange={(checked) => setEditForm({...editForm, is_pallet: !!checked})}
-              />
-              <label htmlFor="edit-pallet" className="text-xs text-muted-foreground cursor-pointer">
-                NF de Pallet (não contabiliza volumes/armazenagem)
-              </label>
+              <Checkbox id="edit-pallet" checked={editForm.is_pallet} onCheckedChange={(checked) => setEditForm({...editForm, is_pallet: !!checked})} />
+              <label htmlFor="edit-pallet" className="text-xs text-muted-foreground cursor-pointer">NF de Pallet</label>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Data da Agenda</label>
@@ -241,6 +271,29 @@ const AgendaPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Add NF dialog */}
+      <Dialog open={!!addNfModal} onOpenChange={(open) => { if (!open) { setAddNfModal(null); setNewNfNumber(""); setNewNfVolumes(""); } }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Adicionar NF</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{addNfModal?.fornecedor}</p>
+            {isAdmin && (
+              <div className="flex gap-2">
+                <Button size="sm" variant={addNfType === "pallet" ? "default" : "outline"} onClick={() => setAddNfType("pallet")} className="flex-1">NF de Pallet</Button>
+                <Button size="sm" variant={addNfType === "regular" ? "default" : "outline"} onClick={() => setAddNfType("regular")} className="flex-1">NF Regular</Button>
+              </div>
+            )}
+            <Input placeholder="Número da NF" inputMode="numeric" value={newNfNumber} onChange={e => setNewNfNumber(e.target.value)} className="bg-secondary" />
+            {addNfType === "regular" && (
+              <Input type="text" inputMode="numeric" placeholder="Qtd Volumes" value={newNfVolumes} onChange={e => setNewNfVolumes(e.target.value)} className="bg-secondary" />
+            )}
+            <Button onClick={handleAddNf} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
+              <PackagePlus className="mr-2 h-4 w-4" /> Adicionar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {groups.map(group => group.items.length > 0 && (
         <div key={group.label} className="space-y-3">
           <h2 className="font-heading text-lg text-foreground border-b border-border pb-1">{group.label}</h2>
@@ -249,34 +302,40 @@ const AgendaPage = () => {
               <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                     <span className="font-heading text-lg text-foreground">
-                        {r.numero_nf.includes("/") ? (
-                          <span className="flex flex-wrap gap-1.5 items-center">
-                            {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
-                              <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
-                                NF {formatNF(nf.trim())}
-                              </span>
-                            ))}
-                          </span>
-                        ) : (
-                          <>NF {formatNF(r.numero_nf)}</>
-                        )}
-                      </span>
+                    <span className="font-heading text-lg text-foreground">
+                      {r.numero_nf.includes("/") ? (
+                        <span className="flex flex-wrap gap-1.5 items-center">
+                          {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                            <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
+                              NF {formatNF(nf.trim())}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <>NF {formatNF(r.numero_nf)}</>
+                      )}
+                    </span>
                     <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                     {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
+                    {r.is_retirada && <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">RETIRADA</span>}
                   </div>
                   <p className="text-sm text-muted-foreground">{r.fornecedor}</p>
                   <p className="text-xs text-muted-foreground">
                     Previsto: {formatDate(r.data_prevista)}
-                    {r.horario_agenda && ` às ${r.horario_agenda}`}
+                    {r.horario_agenda && ` às ${r.horario_agenda.substring(0, 5)}`}
                     {r.hora_chegada && ` · Chegou: ${formatTime(r.hora_chegada)}`}
                   </p>
                   {!r.is_pallet && <p className="text-xs text-muted-foreground">Volumes: {r.quantidade_volumes || 0} caixas</p>}
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {r.status === "AGENDADO" && (
-                    <Button size="sm" onClick={() => handleChegou(r.id)} className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30">
-                      <Truck className="mr-2 h-4 w-4" /> Caminhão Chegou
+                    <Button size="sm" onClick={() => handleChegou(r)} className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30">
+                      <Truck className="mr-2 h-4 w-4" /> {r.is_retirada ? "Chegou (Retirada)" : "Caminhão Chegou"}
+                    </Button>
+                  )}
+                  {!["FINALIZADO"].includes(r.status) && (
+                    <Button size="sm" variant="outline" onClick={() => { setAddNfModal(r); setAddNfType("pallet"); }} className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10">
+                      <PackagePlus className="mr-2 h-4 w-4" /> {isAdmin ? "Adicionar NF" : "Add NF Pallet"}
                     </Button>
                   )}
                   {isAdmin && (
