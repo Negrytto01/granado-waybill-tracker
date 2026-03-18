@@ -64,6 +64,33 @@ export type Database = {
           },
         ]
       }
+      atividades_usuarios: {
+        Row: {
+          acao: string
+          data_criacao: string
+          detalhes: string | null
+          id: string
+          user_id: string
+          usuario_nome: string
+        }
+        Insert: {
+          acao: string
+          data_criacao?: string
+          detalhes?: string | null
+          id?: string
+          user_id: string
+          usuario_nome: string
+        }
+        Update: {
+          acao?: string
+          data_criacao?: string
+          detalhes?: string | null
+          id?: string
+          user_id?: string
+          usuario_nome?: string
+        }
+        Relationships: []
+      }
       cargo_permissoes: {
         Row: {
           ativo: boolean
@@ -159,6 +186,50 @@ export type Database = {
           },
         ]
       }
+      fornecedores_nao_vieram: {
+        Row: {
+          avisou_antecedencia: boolean
+          data_criacao: string
+          fornecedor: string
+          id: string
+          motivo: string
+          multa: number
+          observacoes: string | null
+          recebimento_id: string | null
+          usuario: string | null
+        }
+        Insert: {
+          avisou_antecedencia?: boolean
+          data_criacao?: string
+          fornecedor: string
+          id?: string
+          motivo?: string
+          multa?: number
+          observacoes?: string | null
+          recebimento_id?: string | null
+          usuario?: string | null
+        }
+        Update: {
+          avisou_antecedencia?: boolean
+          data_criacao?: string
+          fornecedor?: string
+          id?: string
+          motivo?: string
+          multa?: number
+          observacoes?: string | null
+          recebimento_id?: string | null
+          usuario?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fornecedores_nao_vieram_recebimento_id_fkey"
+            columns: ["recebimento_id"]
+            isOneToOne: false
+            referencedRelation: "recebimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fornecedores_urgencia: {
         Row: {
           contagem_urgencias: number
@@ -215,6 +286,123 @@ export type Database = {
           mensagem?: string
         }
         Relationships: []
+      }
+      motoristas: {
+        Row: {
+          data_criacao: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          data_criacao?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          data_criacao?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      ocorrencias_armazenagem: {
+        Row: {
+          data_criacao: string
+          fornecedor: string
+          id: string
+          ocorrencia: string
+          registrado_por: string | null
+        }
+        Insert: {
+          data_criacao?: string
+          fornecedor: string
+          id?: string
+          ocorrencia: string
+          registrado_por?: string | null
+        }
+        Update: {
+          data_criacao?: string
+          fornecedor?: string
+          id?: string
+          ocorrencia?: string
+          registrado_por?: string | null
+        }
+        Relationships: []
+      }
+      ocorrencias_tipos: {
+        Row: {
+          data_criacao: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          data_criacao?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          data_criacao?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      portaria_registros: {
+        Row: {
+          data_criacao: string
+          id: string
+          km_chegada: string | null
+          motorista_id: string | null
+          motorista_nome: string | null
+          observacoes_problema: string | null
+          registrado_por: string | null
+          tem_problema: boolean
+          veiculo_id: string | null
+          veiculo_nome: string | null
+          veiculo_placa: string | null
+        }
+        Insert: {
+          data_criacao?: string
+          id?: string
+          km_chegada?: string | null
+          motorista_id?: string | null
+          motorista_nome?: string | null
+          observacoes_problema?: string | null
+          registrado_por?: string | null
+          tem_problema?: boolean
+          veiculo_id?: string | null
+          veiculo_nome?: string | null
+          veiculo_placa?: string | null
+        }
+        Update: {
+          data_criacao?: string
+          id?: string
+          km_chegada?: string | null
+          motorista_id?: string | null
+          motorista_nome?: string | null
+          observacoes_problema?: string | null
+          registrado_por?: string | null
+          tem_problema?: boolean
+          veiculo_id?: string | null
+          veiculo_nome?: string | null
+          veiculo_placa?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portaria_registros_motorista_id_fkey"
+            columns: ["motorista_id"]
+            isOneToOne: false
+            referencedRelation: "motoristas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portaria_registros_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recebimentos: {
         Row: {
@@ -312,6 +500,33 @@ export type Database = {
         }
         Relationships: []
       }
+      relatorios_mensais: {
+        Row: {
+          data_criacao: string
+          fornecedor: string
+          id: string
+          mes_referencia: string
+          total_descargas: number
+          total_volumes: number
+        }
+        Insert: {
+          data_criacao?: string
+          fornecedor: string
+          id?: string
+          mes_referencia: string
+          total_descargas?: number
+          total_volumes?: number
+        }
+        Update: {
+          data_criacao?: string
+          fornecedor?: string
+          id?: string
+          mes_referencia?: string
+          total_descargas?: number
+          total_volumes?: number
+        }
+        Relationships: []
+      }
       solicitacoes_compras: {
         Row: {
           data_aprovacao_compras: string | null
@@ -398,6 +613,7 @@ export type Database = {
           atualizado_em: string
           atualizado_por: string | null
           id: string
+          valor_multa: number
           valor_por_caixa: number
           valor_por_pallet: number
           valor_por_tonelada: number
@@ -406,6 +622,7 @@ export type Database = {
           atualizado_em?: string
           atualizado_por?: string | null
           id?: string
+          valor_multa?: number
           valor_por_caixa?: number
           valor_por_pallet?: number
           valor_por_tonelada?: number
@@ -414,9 +631,34 @@ export type Database = {
           atualizado_em?: string
           atualizado_por?: string | null
           id?: string
+          valor_multa?: number
           valor_por_caixa?: number
           valor_por_pallet?: number
           valor_por_tonelada?: number
+        }
+        Relationships: []
+      }
+      veiculos: {
+        Row: {
+          data_criacao: string
+          id: string
+          modelo: string | null
+          nome: string
+          placa: string
+        }
+        Insert: {
+          data_criacao?: string
+          id?: string
+          modelo?: string | null
+          nome: string
+          placa: string
+        }
+        Update: {
+          data_criacao?: string
+          id?: string
+          modelo?: string | null
+          nome?: string
+          placa?: string
         }
         Relationships: []
       }
@@ -445,6 +687,7 @@ export type Database = {
         | "Master"
         | "Agendamento/Conferente"
         | "Compra"
+        | "Portaria"
       recebimento_status:
         | "AGENDADO"
         | "CHEGOU"
@@ -455,6 +698,7 @@ export type Database = {
         | "ACOPLADO"
         | "DESACOPLADO"
         | "AGUARDANDO DESACOPLAGEM"
+        | "NAO_VEIO"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -600,6 +844,7 @@ export const Constants = {
         "Master",
         "Agendamento/Conferente",
         "Compra",
+        "Portaria",
       ],
       recebimento_status: [
         "AGENDADO",
@@ -611,6 +856,7 @@ export const Constants = {
         "ACOPLADO",
         "DESACOPLADO",
         "AGUARDANDO DESACOPLAGEM",
+        "NAO_VEIO",
       ],
     },
   },
