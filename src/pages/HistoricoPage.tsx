@@ -47,6 +47,11 @@ const HistoricoPage = () => {
 
   const handleDeleteRec = async (id: string) => {
     if (!confirm("Remover este registro e todos os dados vinculados (armazenagem, financeiro)?")) return;
+    // Delete related armazenagem first
+    await supabase.from("armazenagem").delete().eq("recebimento_id", id);
+    // Delete related fluxo_financeiro
+    await supabase.from("fluxo_financeiro").delete().eq("recebimento_id", id);
+    // Delete the recebimento
     const { error } = await supabase.from("recebimentos").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Registro removido!");
@@ -55,7 +60,8 @@ const HistoricoPage = () => {
 
   const handleDeleteArm = async (id: string) => {
     if (!confirm("Remover este registro?")) return;
-    await supabase.from("armazenagem").delete().eq("id", id);
+    const { error } = await supabase.from("armazenagem").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Removido!");
     fetchAll();
   };
@@ -69,12 +75,20 @@ const HistoricoPage = () => {
       horario_agenda: r.horario_agenda || "",
       observacoes: r.observacoes || "",
       nfd_numero: r.nfd_numero || "",
+      valor_cobrado: r.valor_cobrado || 0,
+      caixas_batidas: r.caixas_batidas || 0,
+      pallets_descarregados: r.pallets_descarregados || 0,
+      toneladas: r.toneladas || 0,
+      tipo_descarga: r.tipo_descarga || "nenhum",
     });
     setEditRecModal(r);
   };
 
   const handleEditRec = async () => {
     if (!editRecModal) return;
+    const newValor = Number(editRecForm.valor_cobrado) || 0;
+    const oldValor = Number(editRecModal.valor_cobrado) || 0;
+
     const { error } = await supabase.from("recebimentos").update({
       numero_nf: editRecForm.numero_nf,
       fornecedor: editRecForm.fornecedor,
@@ -83,8 +97,30 @@ const HistoricoPage = () => {
       horario_agenda: editRecForm.horario_agenda || null,
       observacoes: editRecForm.observacoes || null,
       nfd_numero: editRecForm.nfd_numero || null,
+      valor_cobrado: newValor,
+      caixas_batidas: Number(editRecForm.caixas_batidas) || 0,
+      pallets_descarregados: Number(editRecForm.pallets_descarregados) || 0,
+      toneladas: Number(editRecForm.toneladas) || 0,
+      tipo_descarga: editRecForm.tipo_descarga || null,
     }).eq("id", editRecModal.id);
     if (error) { toast.error(error.message); return; }
+
+    // Update fluxo_financeiro if valor changed
+    if (newValor !== oldValor) {
+      // Remove old entry if exists
+      await supabase.from("fluxo_financeiro").delete().eq("recebimento_id", editRecModal.id);
+      // Insert new if valor > 0
+      if (newValor > 0) {
+        await supabase.from("fluxo_financeiro").insert([{
+          tipo: "ENTRADA",
+          descricao: `Descarga NF ${editRecForm.numero_nf} - ${editRecForm.fornecedor}`,
+          valor: newValor,
+          recebimento_id: editRecModal.id,
+          criado_por: profile?.nome,
+        }] as any);
+      }
+    }
+
     toast.success("Registro atualizado!");
     setEditRecModal(null);
     fetchAll();
@@ -295,6 +331,29 @@ const HistoricoPage = () => {
             </div>
             <Textarea placeholder="Observações" value={editRecForm.observacoes || ""} onChange={e => setEditRecForm({...editRecForm, observacoes: e.target.value})} className="bg-secondary" rows={2} />
             <Input placeholder="NFD" value={editRecForm.nfd_numero || ""} onChange={e => setEditRecForm({...editRecForm, nfd_numero: e.target.value})} className="bg-secondary" />
+            
+            <div className="border-t border-border pt-3">
+              <h4 className="text-sm font-heading text-primary mb-2">💰 Cobrança</h4>
+              <div>
+                <label className="text-xs text-muted-foreground">Valor Cobrado (R$)</label>
+                <Input type="number" step="0.01" value={editRecForm.valor_cobrado || ""} onChange={e => setEditRecForm({...editRecForm, valor_cobrado: e.target.value})} className="bg-secondary mt-1" />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">Caixas</label>
+                  <Input type="text" inputMode="numeric" value={editRecForm.caixas_batidas || ""} onChange={e => setEditRecForm({...editRecForm, caixas_batidas: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Pallets</label>
+                  <Input type="text" inputMode="numeric" value={editRecForm.pallets_descarregados || ""} onChange={e => setEditRecForm({...editRecForm, pallets_descarregados: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Toneladas</label>
+                  <Input type="text" inputMode="decimal" value={editRecForm.toneladas || ""} onChange={e => setEditRecForm({...editRecForm, toneladas: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+              </div>
+            </div>
+            
             <Button onClick={handleEditRec} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Atualizar</Button>
           </div>
         </DialogContent>

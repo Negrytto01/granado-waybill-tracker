@@ -1,84 +1,132 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { BarChart3 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { BarChart3, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
-const COLORS = ["#00e639", "#22d3ee", "#a855f7", "#f97316", "#eab308", "#ef4444", "#3b82f6"];
+interface FornecedorStats {
+  fornecedor: string;
+  volumes: number;
+  descargas: number;
+  prevMonthVolumes?: number;
+  prevMonthDescargas?: number;
+}
 
 const RelatoriosPage = () => {
-  const [tempoMedio, setTempoMedio] = useState<any[]>([]);
-  const [volumePorFornecedor, setVolumePorFornecedor] = useState<any[]>([]);
-  const [desempenhoDiario, setDesempenhoDiario] = useState<any[]>([]);
+  const [stats, setStats] = useState<FornecedorStats[]>([]);
+  const [mesRef, setMesRef] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Fetch all finalized recebimentos for analysis
-      const { data: recs } = await supabase
-        .from("recebimentos")
-        .select("*")
-        .not("hora_inicio_descarga", "is", null)
-        .not("hora_fim_descarga", "is", null)
-        .order("data_criacao", { ascending: false })
-        .limit(500);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const [year, month] = mesRef.split("-").map(Number);
+    const startDate = `${mesRef}-01`;
+    const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
-      const allRecs = recs || [];
+    // Previous month
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevStartDate = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
+    const prevEndDate = new Date(prevYear, prevMonth, 0).toISOString().split("T")[0];
 
-      // 1. Average unloading time by day of week
-      const dayMap: Record<string, { total: number; count: number }> = {};
-      const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-      allRecs.forEach(r => {
-        const start = new Date(r.hora_inicio_descarga!);
-        const end = new Date(r.hora_fim_descarga!);
-        const mins = (end.getTime() - start.getTime()) / 60000;
-        if (mins > 0 && mins < 1440) {
-          const day = dayNames[start.getDay()];
-          if (!dayMap[day]) dayMap[day] = { total: 0, count: 0 };
-          dayMap[day].total += mins;
-          dayMap[day].count++;
-        }
+    // Current month data
+    const { data: currentRecs } = await supabase.from("recebimentos").select("fornecedor, quantidade_volumes")
+      .gte("data_prevista", startDate)
+      .lte("data_prevista", endDate)
+      .not("status", "eq", "NAO_VEIO");
+
+    // Previous month data (try saved snapshot first)
+    const { data: savedPrev } = await supabase.from("relatorios_mensais").select("*")
+      .eq("mes_referencia", prevStartDate);
+
+    let prevMap: Record<string, { volumes: number; descargas: number }> = {};
+    if (savedPrev && savedPrev.length > 0) {
+      savedPrev.forEach((s: any) => {
+        prevMap[s.fornecedor] = { volumes: s.total_volumes, descargas: s.total_descargas };
       });
-      setTempoMedio(dayNames.map(d => ({
-        dia: d,
-        minutos: dayMap[d] ? Math.round(dayMap[d].total / dayMap[d].count) : 0
-      })));
-
-      // 2. Volume by supplier (top 10)
-      const { data: allForVolume } = await supabase
-        .from("recebimentos")
-        .select("fornecedor, quantidade_volumes, quantidade_itens")
-        .limit(500);
-
-      const supplierMap: Record<string, number> = {};
-      (allForVolume || []).forEach(r => {
+    } else {
+      // Calculate from recebimentos
+      const { data: prevRecs } = await supabase.from("recebimentos").select("fornecedor, quantidade_volumes")
+        .gte("data_prevista", prevStartDate)
+        .lte("data_prevista", prevEndDate)
+        .not("status", "eq", "NAO_VEIO");
+      (prevRecs || []).forEach(r => {
         const name = r.fornecedor || "N/A";
-        const short = name.length > 20 ? name.substring(0, 20) + "..." : name;
-        supplierMap[short] = (supplierMap[short] || 0) + (r.quantidade_volumes || r.quantidade_itens || 1);
+        if (!prevMap[name]) prevMap[name] = { volumes: 0, descargas: 0 };
+        prevMap[name].volumes += r.quantidade_volumes || 0;
+        prevMap[name].descargas++;
       });
-      const sortedSuppliers = Object.entries(supplierMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([name, value]) => ({ name, value }));
-      setVolumePorFornecedor(sortedSuppliers);
+    }
 
-      // 3. Daily performance (last 14 days)
-      const last14Days: any[] = [];
-      for (let i = 13; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0];
-        const dayLabel = `${d.getDate()}/${d.getMonth() + 1}`;
-        const dayRecs = allRecs.filter(r => r.hora_fim_descarga?.startsWith(dateStr));
-        last14Days.push({
-          dia: dayLabel,
-          descargas: dayRecs.length,
-        });
-      }
-      setDesempenhoDiario(last14Days);
-      setLoading(false);
+    // Current month aggregation
+    const currentMap: Record<string, { volumes: number; descargas: number }> = {};
+    (currentRecs || []).forEach(r => {
+      const name = r.fornecedor || "N/A";
+      if (!currentMap[name]) currentMap[name] = { volumes: 0, descargas: 0 };
+      currentMap[name].volumes += r.quantidade_volumes || 0;
+      currentMap[name].descargas++;
+    });
+
+    const allFornecedores = [...new Set([...Object.keys(currentMap), ...Object.keys(prevMap)])].sort();
+    const result: FornecedorStats[] = allFornecedores.map(f => ({
+      fornecedor: f,
+      volumes: currentMap[f]?.volumes || 0,
+      descargas: currentMap[f]?.descargas || 0,
+      prevMonthVolumes: prevMap[f]?.volumes || 0,
+      prevMonthDescargas: prevMap[f]?.descargas || 0,
+    })).filter(f => f.volumes > 0 || f.descargas > 0);
+
+    setStats(result.sort((a, b) => b.volumes - a.volumes));
+    setLoading(false);
+  }, [mesRef]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Save snapshot for the previous month (day 1 auto-save)
+  const saveSnapshot = async () => {
+    const [year, month] = mesRef.split("-").map(Number);
+    const startDate = `${mesRef}-01`;
+    const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+
+    const { data: recs } = await supabase.from("recebimentos").select("fornecedor, quantidade_volumes")
+      .gte("data_prevista", startDate)
+      .lte("data_prevista", endDate)
+      .not("status", "eq", "NAO_VEIO");
+
+    const map: Record<string, { volumes: number; descargas: number }> = {};
+    (recs || []).forEach(r => {
+      const name = r.fornecedor || "N/A";
+      if (!map[name]) map[name] = { volumes: 0, descargas: 0 };
+      map[name].volumes += r.quantidade_volumes || 0;
+      map[name].descargas++;
+    });
+
+    for (const [fornecedor, data] of Object.entries(map)) {
+      await supabase.from("relatorios_mensais").upsert({
+        mes_referencia: startDate,
+        fornecedor,
+        total_volumes: data.volumes,
+        total_descargas: data.descargas,
+      } as any, { onConflict: "mes_referencia,fornecedor" });
+    }
+
+    toast.success("Snapshot salvo!");
+  };
+
+  const calcPercentChange = (current: number, prev: number): { value: number; color: string; icon: any } => {
+    if (prev === 0 && current === 0) return { value: 0, color: "text-muted-foreground", icon: null };
+    if (prev === 0) return { value: 100, color: "text-emerald-400", icon: TrendingUp };
+    const pct = ((current - prev) / prev) * 100;
+    return {
+      value: Math.round(pct),
+      color: pct >= 0 ? "text-emerald-400" : "text-red-400",
+      icon: pct >= 0 ? TrendingUp : TrendingDown,
     };
-    fetchData();
-  }, []);
+  };
+
+  const totalVolumes = stats.reduce((s, f) => s + f.volumes, 0);
+  const totalDescargas = stats.reduce((s, f) => s + f.descargas, 0);
 
   if (loading) {
     return (
@@ -89,85 +137,69 @@ const RelatoriosPage = () => {
     );
   }
 
-  const hasData = tempoMedio.some(d => d.minutos > 0) || volumePorFornecedor.length > 0;
-
   return (
-    <div className="space-y-8">
-      <h1 className="font-heading text-3xl neon-text">Relatórios</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="font-heading text-3xl neon-text">Relatórios</h1>
+        <div className="flex gap-2 items-center">
+          <Input type="month" value={mesRef} onChange={e => setMesRef(e.target.value)} className="bg-secondary w-44" />
+          <Button variant="outline" size="sm" onClick={saveSnapshot} className="border-primary/50 text-primary">
+            <RefreshCw className="mr-2 h-4 w-4" /> Salvar Snapshot
+          </Button>
+        </div>
+      </div>
 
-      {!hasData ? (
+      {/* Totals */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground uppercase">Total Volumes</span>
+          <p className="font-heading text-3xl text-primary">{totalVolumes}</p>
+        </div>
+        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground uppercase">Total Descargas</span>
+          <p className="font-heading text-3xl text-primary">{totalDescargas}</p>
+        </div>
+      </div>
+
+      {stats.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <BarChart3 className="mx-auto h-12 w-12 mb-3 opacity-30" />
-          <p>Ainda não há dados suficientes para gerar relatórios.</p>
-          <p className="text-xs mt-1">Complete algumas descargas para visualizar os gráficos.</p>
+          <p>Nenhum dado para este mês</p>
         </div>
       ) : (
-        <>
-          {/* Average unloading time */}
-          <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6">
-            <h2 className="font-heading text-xl text-foreground mb-4">Tempo Médio de Descarga (min)</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={tempoMedio}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(160 20% 18%)" />
-                  <XAxis dataKey="dia" stroke="hsl(150 20% 55%)" fontSize={12} />
-                  <YAxis stroke="hsl(150 20% 55%)" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(160 12% 10%)", border: "1px solid hsl(160 20% 18%)", borderRadius: 8, color: "hsl(150 80% 90%)" }}
-                    formatter={(value: number) => [`${value} min`, "Tempo médio"]}
-                  />
-                  <Bar dataKey="minutos" fill="#00e639" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Volume by supplier */}
-          <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6">
-            <h2 className="font-heading text-xl text-foreground mb-4">Volume por Fornecedor</h2>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={volumePorFornecedor}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    dataKey="value"
-                    nameKey="name"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    labelLine={false}
-                  >
-                    {volumePorFornecedor.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(160 12% 10%)", border: "1px solid hsl(160 20% 18%)", borderRadius: 8, color: "hsl(150 80% 90%)" }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Daily performance */}
-          <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6">
-            <h2 className="font-heading text-xl text-foreground mb-4">Desempenho Diário (Descargas)</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={desempenhoDiario}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(160 20% 18%)" />
-                  <XAxis dataKey="dia" stroke="hsl(150 20% 55%)" fontSize={12} />
-                  <YAxis stroke="hsl(150 20% 55%)" fontSize={12} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(160 12% 10%)", border: "1px solid hsl(160 20% 18%)", borderRadius: 8, color: "hsl(150 80% 90%)" }}
-                  />
-                  <Line type="monotone" dataKey="descargas" stroke="#00e639" strokeWidth={2} dot={{ fill: "#00e639", r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {stats.map(f => {
+            const volChange = calcPercentChange(f.volumes, f.prevMonthVolumes || 0);
+            const descChange = calcPercentChange(f.descargas, f.prevMonthDescargas || 0);
+            return (
+              <div key={f.fornecedor} className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2">
+                <h3 className="font-heading text-foreground text-sm truncate" title={f.fornecedor}>{f.fornecedor}</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Volumes</span>
+                    <p className="font-heading text-2xl text-primary">{f.volumes}</p>
+                    {volChange.icon && (
+                      <div className={`flex items-center gap-1 text-xs ${volChange.color}`}>
+                        <volChange.icon className="h-3 w-3" />
+                        <span>{volChange.value > 0 ? "+" : ""}{volChange.value}%</span>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Descargas</span>
+                    <p className="font-heading text-2xl text-primary">{f.descargas}</p>
+                    {descChange.icon && (
+                      <div className={`flex items-center gap-1 text-xs ${descChange.color}`}>
+                        <descChange.icon className="h-3 w-3" />
+                        <span>{descChange.value > 0 ? "+" : ""}{descChange.value}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

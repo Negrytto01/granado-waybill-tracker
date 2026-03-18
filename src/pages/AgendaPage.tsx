@@ -4,12 +4,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getStatusClass, formatDate, formatTime, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Truck, Trash2, Edit, X, PackagePlus } from "lucide-react";
+import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban } from "lucide-react";
 
 interface NFEntry {
   numero_nf: string;
@@ -32,11 +33,16 @@ const AgendaPage = () => {
   const [isRetirada, setIsRetirada] = useState(false);
   const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
   const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "", is_pallet: false });
+  const [naoVeioModal, setNaoVeioModal] = useState<any>(null);
+  const [naoVeioObs, setNaoVeioObs] = useState("");
+  const [valoresConfig, setValoresConfig] = useState({ valor_multa: 0 });
   const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from("recebimentos").select("*").order("data_prevista", { ascending: true }).order("data_criacao", { ascending: false });
     setRecebimentos(data || []);
+    const { data: val } = await supabase.from("valores_descarga").select("valor_multa").limit(1);
+    if (val && val.length > 0) setValoresConfig({ valor_multa: Number((val[0] as any).valor_multa || 0) });
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -66,6 +72,18 @@ const AgendaPage = () => {
     setNfEntries(updated);
   };
 
+  const logActivity = async (acao: string, detalhes?: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (userId) {
+      await supabase.from("atividades_usuarios").insert([{
+        user_id: userId,
+        usuario_nome: profile?.nome || "",
+        acao,
+        detalhes,
+      }] as any);
+    }
+  };
+
   const handleCreate = async () => {
     const validNFs = nfEntries.filter(nf => nf.numero_nf.trim());
     if (validNFs.length === 0) {
@@ -87,6 +105,7 @@ const AgendaPage = () => {
       is_retirada: isRetirada,
     }] as any);
     if (error) { toast.error(error.message); return; }
+    await logActivity("Agendamento criado", `${fornecedor} - NF ${concatenatedNFs}`);
     toast.success("Agendamento salvo!");
     setOpenNew(false);
     resetForm();
@@ -157,6 +176,7 @@ const AgendaPage = () => {
         quantidade_volumes: r.quantidade_volumes || 0,
         status: "AGUARDANDO ARMAZENAGEM" as any,
       }]);
+      await logActivity("Retirada registrada", `${r.fornecedor}`);
       toast.success("Retirada registrada! Enviado para armazenagem.");
     } else {
       await supabase.from("recebimentos").update({
@@ -164,16 +184,43 @@ const AgendaPage = () => {
         hora_chegada: new Date().toISOString(),
         usuario_responsavel: profile?.nome,
       }).eq("id", r.id);
+      await logActivity("Caminhão chegou", `${r.fornecedor}`);
       playTruckArrival();
       toast.success("Chegada registrada!");
     }
+  };
+
+  const handleNaoVeio = async () => {
+    if (!naoVeioModal) return;
+    // Check 2h rule - if horario_agenda exists, check if within 2h before
+    const avisouAntecedencia = false; // User is reporting it now
+
+    await supabase.from("recebimentos").update({
+      status: "NAO_VEIO" as any,
+      observacoes: naoVeioObs ? `Não veio: ${naoVeioObs}` : "Fornecedor não compareceu",
+    }).eq("id", naoVeioModal.id);
+
+    await supabase.from("fornecedores_nao_vieram").insert([{
+      recebimento_id: naoVeioModal.id,
+      fornecedor: naoVeioModal.fornecedor,
+      motivo: "Não veio",
+      observacoes: naoVeioObs || null,
+      usuario: profile?.nome,
+      multa: valoresConfig.valor_multa,
+      avisou_antecedencia: avisouAntecedencia,
+    }] as any);
+
+    await logActivity("Fornecedor não veio", `${naoVeioModal.fornecedor}`);
+    toast.success("Registrado como não compareceu!");
+    setNaoVeioModal(null);
+    setNaoVeioObs("");
   };
 
   const today = new Date().toISOString().split("T")[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
   const groups = [
-    { label: "Atrasados", items: recebimentos.filter(r => r.data_prevista < today && !["FINALIZADO"].includes(r.status)) },
+    { label: "Atrasados", items: recebimentos.filter(r => r.data_prevista < today && !["FINALIZADO", "NAO_VEIO"].includes(r.status)) },
     { label: "Hoje", items: recebimentos.filter(r => r.data_prevista === today) },
     { label: "Amanhã", items: recebimentos.filter(r => r.data_prevista === tomorrow) },
     { label: "Próximos", items: recebimentos.filter(r => r.data_prevista > tomorrow) },
@@ -271,7 +318,7 @@ const AgendaPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add NF dialog */}
+      {/* Add NF dialog - Only Master can add after status changes */}
       <Dialog open={!!addNfModal} onOpenChange={(open) => { if (!open) { setAddNfModal(null); setNewNfNumber(""); setNewNfVolumes(""); } }}>
         <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Adicionar NF</DialogTitle></DialogHeader>
@@ -289,6 +336,25 @@ const AgendaPage = () => {
             )}
             <Button onClick={handleAddNf} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
               <PackagePlus className="mr-2 h-4 w-4" /> Adicionar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Não Veio dialog */}
+      <Dialog open={!!naoVeioModal} onOpenChange={(open) => { if (!open) { setNaoVeioModal(null); setNaoVeioObs(""); } }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text text-red-400">Fornecedor Não Veio</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Fornecedor: <strong className="text-foreground">{naoVeioModal?.fornecedor}</strong></p>
+            {valoresConfig.valor_multa > 0 && (
+              <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10">
+                <p className="text-sm text-red-400">Multa: R$ {valoresConfig.valor_multa.toFixed(2)}</p>
+              </div>
+            )}
+            <Textarea placeholder="Observação (ex: Não avisou, avisou com antecedência...)" value={naoVeioObs} onChange={e => setNaoVeioObs(e.target.value)} className="bg-secondary" rows={3} />
+            <Button onClick={handleNaoVeio} className="w-full bg-red-600 text-white hover:bg-red-700">
+              <Ban className="mr-2 h-4 w-4" /> Confirmar — Não Veio
             </Button>
           </div>
         </DialogContent>
@@ -315,7 +381,7 @@ const AgendaPage = () => {
                         <>NF {formatNF(r.numero_nf)}</>
                       )}
                     </span>
-                    <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                    <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status === "NAO_VEIO" ? "NÃO VEIO" : r.status}</span>
                     {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
                     {r.is_retirada && <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">RETIRADA</span>}
                   </div>
@@ -329,13 +395,24 @@ const AgendaPage = () => {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {r.status === "AGENDADO" && (
-                    <Button size="sm" onClick={() => handleChegou(r)} className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30">
-                      <Truck className="mr-2 h-4 w-4" /> {r.is_retirada ? "Chegou (Retirada)" : "Caminhão Chegou"}
+                    <>
+                      <Button size="sm" onClick={() => handleChegou(r)} className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30">
+                        <Truck className="mr-2 h-4 w-4" /> {r.is_retirada ? "Chegou (Retirada)" : "Caminhão Chegou"}
+                      </Button>
+                      <Button size="sm" onClick={() => setNaoVeioModal(r)} className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30">
+                        <Ban className="mr-2 h-4 w-4" /> Não Veio
+                      </Button>
+                    </>
+                  )}
+                  {/* Add NF button: only AGENDADO for regular users, Master can add anytime */}
+                  {r.status === "AGENDADO" && !isAdmin && (
+                    <Button size="sm" variant="outline" onClick={() => { setAddNfModal(r); setAddNfType("pallet"); }} className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10">
+                      <PackagePlus className="mr-2 h-4 w-4" /> Add NF Pallet
                     </Button>
                   )}
-                  {!["FINALIZADO"].includes(r.status) && (
+                  {isAdmin && !["FINALIZADO", "NAO_VEIO"].includes(r.status) && (
                     <Button size="sm" variant="outline" onClick={() => { setAddNfModal(r); setAddNfType("pallet"); }} className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10">
-                      <PackagePlus className="mr-2 h-4 w-4" /> {isAdmin ? "Adicionar NF" : "Add NF Pallet"}
+                      <PackagePlus className="mr-2 h-4 w-4" /> Adicionar NF
                     </Button>
                   )}
                   {isAdmin && (
