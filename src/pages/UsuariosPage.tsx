@@ -11,7 +11,7 @@ import { UserPlus, Users, KeyRound } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 
-const cargos = ["Master", "Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal"];
+const cargos = ["Master", "Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal", "Portaria"];
 
 const UsuariosPage = () => {
   const { profile, signUp } = useAuth();

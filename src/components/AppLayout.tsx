@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
-  ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell
+  ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell, Activity, DoorOpen, Ban
 } from "lucide-react";
 
 const allNavItems = [
@@ -28,6 +28,9 @@ const allNavItems = [
   { label: "Solicitações", icon: FileText, path: "/solicitacoes", page: "solicitacoes" },
   { label: "Histórico", icon: History, path: "/historico", page: "historico" },
   { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios" },
+  { label: "Não Vieram", icon: Ban, path: "/naovieram", page: "naovieram" },
+  { label: "Portaria", icon: DoorOpen, path: "/portaria", page: "portaria" },
+  { label: "Hist. Portaria", icon: DoorOpen, path: "/portaria-historico", page: "portaria_historico" },
   { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
   { label: "Permissões", icon: Shield, path: "/permissoes", page: "permissoes" },
 ];
@@ -40,8 +43,42 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgText, setMsgText] = useState("");
+  const [urgentAlert, setUrgentAlert] = useState(false);
+  const [urgentFornecedores, setUrgentFornecedores] = useState<string[]>([]);
 
   useInactivityTimeout();
+
+  // Check for urgent suppliers alert on Mondays, 3rd week+
+  useEffect(() => {
+    const checkAlert = async () => {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon
+      const dayOfMonth = today.getDate();
+      
+      // Only show on Monday, from 3rd week (day >= 15)
+      if (dayOfWeek !== 1 || dayOfMonth < 15) return;
+      
+      // Only for Agenda and Compra permissions
+      if (!hasAccess("agenda") && !hasAccess("compras") && !isAdmin) return;
+
+      // Check if already dismissed today
+      const dismissedKey = `urgent_alert_${today.toISOString().split("T")[0]}`;
+      if (localStorage.getItem(dismissedKey)) return;
+
+      const { data } = await supabase.from("fornecedores_urgencia").select("nome_fornecedor").order("contagem_urgencias", { ascending: false });
+      if (data && data.length > 0) {
+        setUrgentFornecedores(data.map((f: any) => f.nome_fornecedor));
+        setUrgentAlert(true);
+      }
+    };
+    checkAlert();
+  }, [hasAccess, isAdmin]);
+
+  const dismissAlert = () => {
+    const dismissedKey = `urgent_alert_${new Date().toISOString().split("T")[0]}`;
+    localStorage.setItem(dismissedKey, "true");
+    setUrgentAlert(false);
+  };
 
   const handleSendMsg = async () => {
     if (!msgText.trim()) { toast.error("Digite a mensagem"); return; }
@@ -62,6 +99,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     return hasAccess(item.page);
   });
 
+  // Admin-only hidden nav item for activities
+  const showActivities = isAdmin;
+
   return (
     <div className="min-h-screen bg-background relative">
       <ParticlesBackground />
@@ -75,9 +115,14 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         <span className="font-heading text-lg neon-text tracking-wider hidden sm:block">Granado Distribuidora</span>
         <div className="ml-auto flex items-center gap-3">
           {isAdmin && (
-            <Button variant="ghost" size="icon" onClick={() => setMsgOpen(true)} title="Enviar mensagem global">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-            </Button>
+            <>
+              <Button variant="ghost" size="icon" onClick={() => navigate("/atividades")} title="Atividades em tempo real">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setMsgOpen(true)} title="Enviar mensagem global">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </>
           )}
           <span className="text-sm text-foreground">{profile?.nome}</span>
           <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary font-semibold">{profile?.cargo}</span>
@@ -136,6 +181,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
       <GlobalMessageListener />
 
+      {/* Send message dialog */}
       <Dialog open={msgOpen} onOpenChange={setMsgOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Enviar Mensagem Global</DialogTitle></DialogHeader>
@@ -144,6 +190,32 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             <Button onClick={handleSendMsg} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
               <Send className="mr-2 h-4 w-4" /> Enviar para Todos
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Urgent suppliers alert */}
+      <Dialog open={urgentAlert} onOpenChange={(open) => { if (!open) dismissAlert(); }}>
+        <DialogContent className="bg-card border-red-500/30">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-red-400 flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6" />
+              ATENÇÃO URGENTE
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Ficar atento com esses fornecedores que precisa entregar dentro do Mês:
+            </p>
+            <div className="space-y-2">
+              {urgentFornecedores.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 p-2 rounded-lg border border-red-500/20 bg-red-500/5">
+                  <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                  <span className="text-foreground font-medium">{f}</span>
+                </div>
+              ))}
+            </div>
+            <Button onClick={dismissAlert} className="w-full bg-red-600 text-white hover:bg-red-700">Entendido</Button>
           </div>
         </DialogContent>
       </Dialog>

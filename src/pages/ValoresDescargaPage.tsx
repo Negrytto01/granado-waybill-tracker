@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { DollarSign } from "lucide-react";
+import { formatNF } from "@/lib/helpers";
 
 const ValoresDescargaPage = () => {
   const { profile } = useAuth();
   const [valorCaixa, setValorCaixa] = useState("");
   const [valorPallet, setValorPallet] = useState("");
   const [valorTonelada, setValorTonelada] = useState("");
+  const [valorMulta, setValorMulta] = useState("");
   const [loading, setLoading] = useState(true);
   const [existingId, setExistingId] = useState<string | null>(null);
   const [recebimentos, setRecebimentos] = useState<any[]>([]);
@@ -21,6 +23,7 @@ const ValoresDescargaPage = () => {
       setValorCaixa(String(valores[0].valor_por_caixa));
       setValorPallet(String(valores[0].valor_por_pallet));
       setValorTonelada(String(valores[0].valor_por_tonelada || 0));
+      setValorMulta(String((valores[0] as any).valor_multa || 0));
       setExistingId(valores[0].id);
     }
 
@@ -38,17 +41,20 @@ const ValoresDescargaPage = () => {
     const caixa = parseFloat(valorCaixa) || 0;
     const pallet = parseFloat(valorPallet) || 0;
     const tonelada = parseFloat(valorTonelada) || 0;
+    const multa = parseFloat(valorMulta) || 0;
 
     if (existingId) {
       const { error } = await supabase.from("valores_descarga").update({
         valor_por_caixa: caixa, valor_por_pallet: pallet, valor_por_tonelada: tonelada,
+        valor_multa: multa,
         atualizado_em: new Date().toISOString(), atualizado_por: profile?.nome,
-      }).eq("id", existingId);
+      } as any).eq("id", existingId);
       if (error) { toast.error(error.message); return; }
     } else {
       const { error } = await supabase.from("valores_descarga").insert([{
-        valor_por_caixa: caixa, valor_por_pallet: pallet, valor_por_tonelada: tonelada, atualizado_por: profile?.nome,
-      }]);
+        valor_por_caixa: caixa, valor_por_pallet: pallet, valor_por_tonelada: tonelada,
+        valor_multa: multa, atualizado_por: profile?.nome,
+      }] as any);
       if (error) { toast.error(error.message); return; }
     }
     toast.success("Valores salvos!");
@@ -59,6 +65,19 @@ const ValoresDescargaPage = () => {
     return <div className="text-center py-12 text-muted-foreground">Acesso restrito a administradores</div>;
   }
   if (loading) return <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>;
+
+  const renderNFs = (nf: string) => {
+    if (nf.includes("/")) {
+      return (
+        <span className="flex flex-wrap gap-1 items-center">
+          {nf.split(/\s*\/\s*/).map((n, i) => (
+            <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">NF {formatNF(n.trim())}</span>
+          ))}
+        </span>
+      );
+    }
+    return <span>NF {formatNF(nf)}</span>;
+  };
 
   return (
     <div className="space-y-6">
@@ -76,6 +95,10 @@ const ValoresDescargaPage = () => {
           <label className="text-sm text-muted-foreground">Valor por Tonelada (R$)</label>
           <Input type="number" step="0.01" value={valorTonelada} onChange={e => setValorTonelada(e.target.value)} className="bg-secondary mt-1" />
         </div>
+        <div className="border-t border-border pt-4">
+          <label className="text-sm text-red-400">Valor da Multa — Não Comparecimento (R$)</label>
+          <Input type="number" step="0.01" value={valorMulta} onChange={e => setValorMulta(e.target.value)} className="bg-secondary mt-1" />
+        </div>
         <Button onClick={handleSave} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
           <DollarSign className="mr-2 h-4 w-4" /> Salvar Valores
         </Button>
@@ -87,7 +110,7 @@ const ValoresDescargaPage = () => {
           {recebimentos.map(r => (
             <div key={r.id} className="p-3 rounded-lg border border-border bg-card/40 flex justify-between items-center">
               <div>
-                <span className="font-heading text-foreground">NF {r.numero_nf}</span>
+                <span className="font-heading text-foreground">{renderNFs(r.numero_nf)}</span>
                 <p className="text-xs text-muted-foreground">{r.fornecedor}</p>
               </div>
               <div className="text-right">

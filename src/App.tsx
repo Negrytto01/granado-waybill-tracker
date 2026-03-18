@@ -20,6 +20,9 @@ import FluxoFinanceiroPage from "@/pages/FluxoFinanceiroPage";
 import PermissoesPage from "@/pages/PermissoesPage";
 import CalendarioPage from "@/pages/CalendarioPage";
 import SolicitacoesComprasPage from "@/pages/SolicitacoesComprasPage";
+import PortariaPage from "@/pages/PortariaPage";
+import AtividadesAdminPage from "@/pages/AtividadesAdminPage";
+import FornecedoresNaoVieramPage from "@/pages/FornecedoresNaoVieramPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +64,10 @@ const App = () => (
             <Route path="/permissoes" element={<ProtectedRoute><PermissoesPage /></ProtectedRoute>} />
             <Route path="/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
             <Route path="/solicitacoes" element={<ProtectedRoute><SolicitacoesComprasPage /></ProtectedRoute>} />
+            <Route path="/portaria" element={<ProtectedRoute><PortariaPage /></ProtectedRoute>} />
+            <Route path="/portaria-historico" element={<ProtectedRoute><PortariaPage /></ProtectedRoute>} />
+            <Route path="/naovieram" element={<ProtectedRoute><FornecedoresNaoVieramPage /></ProtectedRoute>} />
+            <Route path="/atividades" element={<ProtectedRoute><AtividadesAdminPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

@@ -33,6 +33,7 @@ const DescargaPage = () => {
   const [tipoDescarga, setTipoDescarga] = useState("nenhum");
   const [observacoes, setObservacoes] = useState("");
   const [nfdNumero, setNfdNumero] = useState("");
+  const [jaArmazenado, setJaArmazenado] = useState(false);
   const [valoresConfig, setValoresConfig] = useState({ valor_por_caixa: 0, valor_por_pallet: 0, valor_por_tonelada: 0 });
   const isAdmin = profile?.cargo === "Master";
 
@@ -61,12 +62,25 @@ const DescargaPage = () => {
     return () => clearInterval(i);
   }, [recebimentos]);
 
-  const acoplar = async (id: string) => {
+  const logActivity = async (acao: string, detalhes?: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (userId) {
+      await supabase.from("atividades_usuarios").insert([{
+        user_id: userId,
+        usuario_nome: profile?.nome || "",
+        acao,
+        detalhes,
+      }] as any);
+    }
+  };
+
+  const acoplar = async (id: string, r: any) => {
     await supabase.from("recebimentos").update({
       status: "ACOPLADO" as any,
       hora_acoplagem: new Date().toISOString(),
       usuario_responsavel: profile?.nome
     }).eq("id", id);
+    await logActivity("Caminhão acoplado", `${r.fornecedor}`);
     toast.success("Caminhão acoplado!");
   };
 
@@ -106,6 +120,7 @@ const DescargaPage = () => {
       observacoes: newObs || null,
     }).eq("id", verificacaoModal.id);
 
+    await logActivity("Descarga iniciada", `${verificacaoModal.fornecedor}`);
     toast.success("Descarga iniciada!");
     setVerificacaoModal(null);
   };
@@ -118,6 +133,7 @@ const DescargaPage = () => {
     setTipoDescarga("nenhum");
     setObservacoes(r.observacoes || "");
     setNfdNumero(r.nfd_numero || "");
+    setJaArmazenado(false);
   };
 
   const calcValorTotal = () => {
@@ -150,7 +166,7 @@ const DescargaPage = () => {
       nfd_numero: nfdNumero || null,
     }).eq("id", finalizarModal.id);
 
-    if (!finalizarModal.is_pallet) {
+    if (!finalizarModal.is_pallet && !jaArmazenado) {
       await supabase.from("armazenagem").insert([{
         recebimento_id: finalizarModal.id,
         quantidade_itens: finalizarModal.quantidade_itens || 0,
@@ -158,6 +174,18 @@ const DescargaPage = () => {
         status: "AGUARDANDO ARMAZENAGEM" as any,
         usuario_responsavel: profile?.nome,
       }]);
+    } else if (jaArmazenado) {
+      // Already stored - mark as finalized directly
+      await supabase.from("armazenagem").insert([{
+        recebimento_id: finalizarModal.id,
+        quantidade_itens: finalizarModal.quantidade_itens || 0,
+        quantidade_volumes: finalizarModal.quantidade_volumes || 0,
+        status: "FINALIZADO" as any,
+        usuario_responsavel: profile?.nome,
+        hora_inicio: new Date().toISOString(),
+        hora_fim: new Date().toISOString(),
+        observacoes_armazenagem: "Armazenado durante a descarga",
+      }] as any);
     }
 
     if (valorTotal > 0) {
@@ -170,6 +198,7 @@ const DescargaPage = () => {
       }] as any);
     }
 
+    await logActivity("Descarga finalizada", `${finalizarModal.fornecedor} - R$ ${valorTotal.toFixed(2)}`);
     playDescargaFinalizada();
     toast.success(valorTotal > 0 ? `Descarga finalizada! Valor: R$ ${valorTotal.toFixed(2)}` : "Descarga finalizada!");
     setFinalizarModal(null);
@@ -182,6 +211,7 @@ const DescargaPage = () => {
       status: finalStatus as any,
       hora_desacoplagem: new Date().toISOString(),
     }).eq("id", desacoplarModal.id);
+    await logActivity("Caminhão desacoplado", `${desacoplarModal.fornecedor}`);
     toast.success("Caminhão desacoplado! Saída registrada.");
     setDesacoplarModal(null);
   };
@@ -246,7 +276,7 @@ const DescargaPage = () => {
               </div>
               <div className="flex gap-2 flex-wrap">
                 {r.status === "CHEGOU" && (
-                  <Button size="sm" onClick={() => acoplar(r.id)} className="bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30">
+                  <Button size="sm" onClick={() => acoplar(r.id, r)} className="bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30">
                     <Link className="mr-2 h-4 w-4" /> Acoplar
                   </Button>
                 )}
@@ -331,6 +361,15 @@ const DescargaPage = () => {
               <label className="text-sm text-muted-foreground">NFD (Nota Fiscal de Devolução)</label>
               <Input value={nfdNumero} onChange={e => setNfdNumero(e.target.value)} className="bg-secondary mt-1" placeholder="Número da NFD (se houver)" inputMode="numeric" />
             </div>
+
+            {/* Já armazenado? */}
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+              <Checkbox id="ja-armazenado" checked={jaArmazenado} onCheckedChange={(checked) => setJaArmazenado(!!checked)} />
+              <label htmlFor="ja-armazenado" className="text-sm text-emerald-400 cursor-pointer font-medium">
+                Mercadoria já foi armazenada durante a descarga
+              </label>
+            </div>
+
             <p className="text-xs text-muted-foreground italic">Os campos de cobrança abaixo são opcionais.</p>
             <div>
               <label className="text-sm text-muted-foreground">Tipo de Descarga</label>
