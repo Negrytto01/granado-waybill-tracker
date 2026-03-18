@@ -7,21 +7,24 @@ import { Shield } from "lucide-react";
 
 const allPages = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "calendario", label: "Calendário" },
   { key: "agenda", label: "Agenda" },
   { key: "descarga", label: "Descarga" },
   { key: "armazenagem", label: "Armazenagem" },
-  { key: "relatorios", label: "Relatórios" },
-  { key: "historico", label: "Histórico" },
   { key: "compras", label: "Compras" },
-  { key: "fornecedores", label: "Fornecedores Urgência" },
   { key: "financeiro", label: "Financeiro" },
+  { key: "fornecedores", label: "Fornecedores Urgência" },
+  { key: "solicitacoes", label: "Solicitações" },
+  { key: "historico", label: "Histórico" },
+  { key: "relatorios", label: "Relatórios" },
+  { key: "naovieram", label: "Não Compareceram / Multas" },
+  { key: "portaria", label: "Portaria" },
+  { key: "portaria_historico", label: "Histórico Portaria" },
   { key: "valores", label: "Valores Descarga" },
   { key: "usuarios", label: "Usuários" },
-  { key: "calendario", label: "Calendário" },
-  { key: "solicitacoes", label: "Solicitações" },
 ];
 
-const cargos = ["Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal"];
+const cargos = ["Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal", "Portaria"];
 
 const PermissoesPage = () => {
   const { profile } = useAuth();

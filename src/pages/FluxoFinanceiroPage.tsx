@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
-import { formatDateTime } from "@/lib/helpers";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Trash2, RefreshCw } from "lucide-react";
+import { formatDateTime, formatNF } from "@/lib/helpers";
 
 const FluxoFinanceiroPage = () => {
   const { profile } = useAuth();
@@ -37,6 +37,46 @@ const FluxoFinanceiroPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
+  // Sync financeiro with recebimentos that have valor_cobrado
+  const syncFinanceiro = async () => {
+    const startDate = `${mesRef}-01`;
+    const endDate = new Date(Number(mesRef.split("-")[0]), Number(mesRef.split("-")[1]), 0).toISOString().split("T")[0];
+
+    // Get all recebimentos with valor_cobrado > 0 for this month
+    const { data: recs } = await supabase.from("recebimentos").select("*")
+      .gt("valor_cobrado", 0)
+      .gte("hora_fim_descarga", `${startDate}T00:00:00`)
+      .lte("hora_fim_descarga", `${endDate}T23:59:59`);
+
+    // Get existing fluxo entries for this month
+    const { data: existingFluxos } = await supabase.from("fluxo_financeiro").select("recebimento_id")
+      .gte("mes_referencia", startDate)
+      .lte("mes_referencia", endDate)
+      .eq("tipo", "ENTRADA");
+
+    const existingIds = new Set((existingFluxos || []).map(f => f.recebimento_id).filter(Boolean));
+    const toInsert = (recs || []).filter(r => !existingIds.has(r.id));
+
+    if (toInsert.length === 0) {
+      toast.info("Tudo sincronizado!");
+      return;
+    }
+
+    for (const r of toInsert) {
+      await supabase.from("fluxo_financeiro").insert([{
+        tipo: "ENTRADA",
+        descricao: `Descarga NF ${r.numero_nf} - ${r.fornecedor}`,
+        valor: r.valor_cobrado,
+        recebimento_id: r.id,
+        criado_por: r.usuario_responsavel,
+        mes_referencia: startDate,
+      }] as any);
+    }
+
+    toast.success(`${toInsert.length} lançamento(s) sincronizado(s)!`);
+    fetchData();
+  };
+
   const handleAddSaida = async () => {
     if (!form.descricao || !form.valor) { toast.error("Preencha todos os campos"); return; }
     const { error } = await supabase.from("fluxo_financeiro").insert([{
@@ -60,6 +100,29 @@ const FluxoFinanceiroPage = () => {
     fetchData();
   };
 
+  const renderNFsInDescription = (desc: string) => {
+    // Try to extract NFs from description like "Descarga NF 444618 / 444567 - Fornecedor"
+    const nfMatch = desc.match(/NF\s+(.+?)\s*-/);
+    if (!nfMatch) return desc;
+    const nfPart = nfMatch[1];
+    const nfs = nfPart.split(/\s*\/\s*/);
+    if (nfs.length <= 1) {
+      return desc.replace(/NF\s+(.+?)\s*-/, `NF ${formatNF(nfs[0].trim())} -`);
+    }
+    return (
+      <span>
+        Descarga{" "}
+        {nfs.map((nf, i) => (
+          <span key={i}>
+            <span className="inline-block px-1 py-0.5 rounded bg-secondary text-xs">NF {formatNF(nf.trim())}</span>
+            {i < nfs.length - 1 && " "}
+          </span>
+        ))}
+        {" - "}{desc.split(" - ").slice(1).join(" - ")}
+      </span>
+    );
+  };
+
   const totalEntradas = fluxos.filter(f => f.tipo === "ENTRADA").reduce((a, f) => a + Number(f.valor), 0);
   const totalSaidas = fluxos.filter(f => f.tipo === "SAIDA").reduce((a, f) => a + Number(f.valor), 0);
   const saldo = totalEntradas - totalSaidas;
@@ -71,21 +134,26 @@ const FluxoFinanceiroPage = () => {
         <div className="flex gap-2 items-center">
           <Input type="month" value={mesRef} onChange={e => setMesRef(e.target.value)} className="bg-secondary w-44" />
           {isAdmin && (
-            <Dialog open={openNew} onOpenChange={setOpenNew}>
-              <DialogTrigger asChild>
-                <Button className="bg-destructive text-destructive-foreground hover:bg-destructive/80">
-                  <Plus className="mr-2 h-4 w-4" /> Nova Saída
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-card border-border">
-                <DialogHeader><DialogTitle className="font-heading neon-text">Registrar Saída</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                  <Input placeholder="Descrição *" value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} className="bg-secondary" />
-                  <Input type="number" step="0.01" placeholder="Valor (R$) *" value={form.valor} onChange={e => setForm({...form, valor: e.target.value})} className="bg-secondary" />
-                  <Button onClick={handleAddSaida} className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/80">Salvar Saída</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <>
+              <Button variant="outline" size="sm" onClick={syncFinanceiro} title="Sincronizar com histórico" className="border-primary/50 text-primary">
+                <RefreshCw className="mr-2 h-4 w-4" /> Sincronizar
+              </Button>
+              <Dialog open={openNew} onOpenChange={setOpenNew}>
+                <DialogTrigger asChild>
+                  <Button className="bg-destructive text-destructive-foreground hover:bg-destructive/80">
+                    <Plus className="mr-2 h-4 w-4" /> Nova Saída
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border">
+                  <DialogHeader><DialogTitle className="font-heading neon-text">Registrar Saída</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <Input placeholder="Descrição *" value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} className="bg-secondary" />
+                    <Input type="number" step="0.01" placeholder="Valor (R$) *" value={form.valor} onChange={e => setForm({...form, valor: e.target.value})} className="bg-secondary" />
+                    <Button onClick={handleAddSaida} className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/80">Salvar Saída</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       </div>
@@ -120,7 +188,7 @@ const FluxoFinanceiroPage = () => {
             <div className="flex items-center gap-3">
               {f.tipo === "ENTRADA" ? <TrendingUp className="h-4 w-4 text-emerald-400" /> : <TrendingDown className="h-4 w-4 text-red-400" />}
               <div>
-                <p className="text-foreground">{f.descricao}</p>
+                <p className="text-foreground">{renderNFsInDescription(f.descricao)}</p>
                 <p className="text-xs text-muted-foreground">{formatDateTime(f.data_criacao)} · {f.criado_por}</p>
               </div>
             </div>

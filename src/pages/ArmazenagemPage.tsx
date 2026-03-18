@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getStatusClass, formatNF, calcEffectiveArmazenagemTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
-import { Package, Trash2, Pause, Play, CheckCircle } from "lucide-react";
+import { Package, Trash2, Pause, Play, CheckCircle, Plus, Wrench } from "lucide-react";
 
 const getAgingColor = (dataCriacao: string): { color: string; label: string; days: number } => {
   const days = Math.floor((Date.now() - new Date(dataCriacao).getTime()) / 86400000);
@@ -23,13 +26,25 @@ const ArmazenagemPage = () => {
   const { profile } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [, setTick] = useState(0);
+  const [openOcorrencia, setOpenOcorrencia] = useState(false);
+  const [openNovoTipo, setOpenNovoTipo] = useState(false);
+  const [ocorrenciaForm, setOcorrenciaForm] = useState({ fornecedor: "", ocorrencia: "" });
+  const [novoTipoNome, setNovoTipoNome] = useState("");
+  const [tiposOcorrencia, setTiposOcorrencia] = useState<any[]>([]);
+  const [ocorrencias, setOcorrencias] = useState<any[]>([]);
   const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
-    const { data } = await supabase.from("armazenagem").select("*, recebimentos(numero_nf, fornecedor, hora_fim_descarga, is_pallet, quantidade_volumes)")
-      .in("status", ["AGUARDANDO ARMAZENAGEM", "EM ARMAZENAGEM", "PAUSADO"])
-      .order("data_criacao", { ascending: true });
-    setItems((data || []).filter(item => !item.recebimentos?.is_pallet));
+    const [armData, tiposData, ocorrData] = await Promise.all([
+      supabase.from("armazenagem").select("*, recebimentos(numero_nf, fornecedor, hora_fim_descarga, is_pallet, quantidade_volumes)")
+        .in("status", ["AGUARDANDO ARMAZENAGEM", "EM ARMAZENAGEM", "PAUSADO"])
+        .order("data_criacao", { ascending: true }),
+      supabase.from("ocorrencias_tipos").select("*").order("nome"),
+      supabase.from("ocorrencias_armazenagem").select("*").order("data_criacao", { ascending: false }).limit(50),
+    ]);
+    setItems(((armData.data as any[]) || []).filter(item => !item.recebimentos?.is_pallet));
+    setTiposOcorrencia((tiposData.data as any[]) || []);
+    setOcorrencias((ocorrData.data as any[]) || []);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -42,13 +57,26 @@ const ArmazenagemPage = () => {
     return () => clearInterval(interval);
   }, [items]);
 
-  const iniciarArmazenagem = async (id: string) => {
+  const logActivity = async (acao: string, detalhes?: string) => {
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (userId) {
+      await supabase.from("atividades_usuarios").insert([{
+        user_id: userId,
+        usuario_nome: profile?.nome || "",
+        acao,
+        detalhes,
+      }] as any);
+    }
+  };
+
+  const iniciarArmazenagem = async (id: string, item: any) => {
     const { error } = await supabase.from("armazenagem").update({
       status: "EM ARMAZENAGEM" as any,
       hora_inicio: new Date().toISOString(),
       usuario_responsavel: profile?.nome,
     }).eq("id", id);
     if (error) { toast.error(error.message); return; }
+    await logActivity("Iniciou armazenagem", `${item.recebimentos?.fornecedor}`);
     toast.success("Armazenagem iniciada!");
   };
 
@@ -60,6 +88,7 @@ const ArmazenagemPage = () => {
       pausas,
     } as any).eq("id", item.id);
     if (error) { toast.error(error.message); return; }
+    await logActivity("Pausou armazenagem", `${item.recebimentos?.fornecedor}`);
     toast.info("Armazenagem pausada!");
   };
 
@@ -73,6 +102,7 @@ const ArmazenagemPage = () => {
       pausas,
     } as any).eq("id", item.id);
     if (error) { toast.error(error.message); return; }
+    await logActivity("Retomou armazenagem", `${item.recebimentos?.fornecedor}`);
     toast.success("Armazenagem retomada!");
   };
 
@@ -115,6 +145,7 @@ const ArmazenagemPage = () => {
       }] as any);
     }
 
+    await logActivity("Finalizou armazenagem", `${rec?.fornecedor}`);
     toast.success("Armazenagem finalizada!");
   };
 
@@ -125,9 +156,84 @@ const ArmazenagemPage = () => {
     toast.success("Removido!");
   };
 
+  const handleAddOcorrencia = async () => {
+    if (!ocorrenciaForm.fornecedor || !ocorrenciaForm.ocorrencia) { toast.error("Preencha todos os campos"); return; }
+    const { error } = await supabase.from("ocorrencias_armazenagem").insert([{
+      fornecedor: ocorrenciaForm.fornecedor,
+      ocorrencia: ocorrenciaForm.ocorrencia,
+      registrado_por: profile?.nome,
+    }] as any);
+    if (error) { toast.error(error.message); return; }
+    await logActivity("Ocorrência armazenagem", `${ocorrenciaForm.fornecedor} - ${ocorrenciaForm.ocorrencia}`);
+    toast.success("Ocorrência registrada!");
+    setOpenOcorrencia(false);
+    setOcorrenciaForm({ fornecedor: "", ocorrencia: "" });
+    fetchData();
+  };
+
+  const handleAddTipo = async () => {
+    if (!novoTipoNome) { toast.error("Informe o nome"); return; }
+    const { error } = await supabase.from("ocorrencias_tipos").insert([{ nome: novoTipoNome }] as any);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Tipo de ocorrência criado!");
+    setOpenNovoTipo(false);
+    setNovoTipoNome("");
+    fetchData();
+  };
+
+  const handleDeleteOcorrencia = async (id: string) => {
+    if (!confirm("Remover?")) return;
+    await supabase.from("ocorrencias_armazenagem").delete().eq("id", id);
+    toast.success("Removido!");
+    fetchData();
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl neon-text">Fila de Armazenagem</h1>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="font-heading text-3xl neon-text">Fila de Armazenagem</h1>
+        <div className="flex gap-2">
+          <Dialog open={openOcorrencia} onOpenChange={setOpenOcorrencia}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-primary/50 text-primary">
+                <Wrench className="mr-2 h-4 w-4" /> Ocorrência
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader><DialogTitle className="font-heading neon-text">Registrar Ocorrência</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <Input placeholder="Fornecedor" value={ocorrenciaForm.fornecedor} onChange={e => setOcorrenciaForm({...ocorrenciaForm, fornecedor: e.target.value})} className="bg-secondary" />
+                <div>
+                  <label className="text-xs text-muted-foreground">Tipo de Ocorrência</label>
+                  <Select value={ocorrenciaForm.ocorrencia} onValueChange={v => setOcorrenciaForm({...ocorrenciaForm, ocorrencia: v})}>
+                    <SelectTrigger className="bg-secondary mt-1"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                    <SelectContent>
+                      {tiposOcorrencia.map(t => <SelectItem key={t.id} value={t.nome}>{t.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {isAdmin && (
+                  <Button variant="link" size="sm" onClick={() => setOpenNovoTipo(true)} className="text-primary p-0">
+                    <Plus className="h-3 w-3 mr-1" /> Criar novo tipo
+                  </Button>
+                )}
+                <Button onClick={handleAddOcorrencia} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* New tipo modal */}
+      <Dialog open={openNovoTipo} onOpenChange={setOpenNovoTipo}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Novo Tipo de Ocorrência</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Nome (ex: Reposição, Organização)" value={novoTipoNome} onChange={e => setNovoTipoNome(e.target.value)} className="bg-secondary" />
+            <Button onClick={handleAddTipo} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Criar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500" /> Até 5 dias</span>
@@ -188,7 +294,7 @@ const ArmazenagemPage = () => {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {item.status === "AGUARDANDO ARMAZENAGEM" && (
-                    <Button size="sm" onClick={() => iniciarArmazenagem(item.id)} className="bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30">
+                    <Button size="sm" onClick={() => iniciarArmazenagem(item.id, item)} className="bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30">
                       <Play className="mr-2 h-4 w-4" /> Iniciar Armazenagem
                     </Button>
                   )}
@@ -216,6 +322,27 @@ const ArmazenagemPage = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Ocorrências list */}
+      {ocorrencias.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-heading text-lg text-foreground border-t border-border pt-4">Ocorrências Recentes</h2>
+          {ocorrencias.map(o => (
+            <div key={o.id} className="p-3 rounded-lg border border-border bg-card/40 flex justify-between items-center">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-heading text-foreground text-sm">{o.fornecedor}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">{o.ocorrencia}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{o.registrado_por} · {new Date(o.data_criacao).toLocaleDateString("pt-BR")}</p>
+              </div>
+              {isAdmin && (
+                <Button variant="ghost" size="icon" onClick={() => handleDeleteOcorrencia(o.id)} className="text-destructive h-6 w-6"><Trash2 className="h-3 w-3" /></Button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

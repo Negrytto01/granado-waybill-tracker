@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-type TableName = "recebimentos" | "armazenagem" | "etiquetas_pallet" | "usuarios" | "cargo_permissoes" | "valores_descarga" | "fornecedores_urgencia" | "fluxo_financeiro";
+type TableName = "recebimentos" | "armazenagem" | "etiquetas_pallet" | "usuarios" | "cargo_permissoes" | "valores_descarga" | "fornecedores_urgencia" | "fluxo_financeiro" | "veiculos" | "motoristas" | "portaria_registros" | "atividades_usuarios" | "fornecedores_nao_vieram" | "ocorrencias_armazenagem";
 
 export const useRealtime = (
   table: TableName,

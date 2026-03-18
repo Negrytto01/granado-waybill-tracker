@@ -11,6 +11,7 @@ export const getStatusClass = (status: string): string => {
     'FINALIZADO': 'status-finalizado',
     'EM ARMAZENAGEM': 'status-em-descarga',
     'PAUSADO': 'status-descarga-finalizada',
+    'NAO_VEIO': 'status-agendado',
   };
   return map[status] || 'status-agendado';
 };
