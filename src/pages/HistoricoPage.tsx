@@ -22,6 +22,8 @@ const HistoricoPage = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editRecModal, setEditRecModal] = useState<any>(null);
   const [editRecForm, setEditRecForm] = useState<any>({});
+  const [editArmModal, setEditArmModal] = useState<any>(null);
+  const [editArmForm, setEditArmForm] = useState<any>({});
   const isAdmin = profile?.cargo === "Master";
 
   const fetchAll = useCallback(async () => {
@@ -47,11 +49,8 @@ const HistoricoPage = () => {
 
   const handleDeleteRec = async (id: string) => {
     if (!confirm("Remover este registro e todos os dados vinculados (armazenagem, financeiro)?")) return;
-    // Delete related armazenagem first
     await supabase.from("armazenagem").delete().eq("recebimento_id", id);
-    // Delete related fluxo_financeiro
     await supabase.from("fluxo_financeiro").delete().eq("recebimento_id", id);
-    // Delete the recebimento
     const { error } = await supabase.from("recebimentos").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Registro removido!");
@@ -80,6 +79,11 @@ const HistoricoPage = () => {
       pallets_descarregados: r.pallets_descarregados || 0,
       toneladas: r.toneladas || 0,
       tipo_descarga: r.tipo_descarga || "nenhum",
+      hora_chegada: r.hora_chegada ? new Date(r.hora_chegada).toISOString().slice(0, 16) : "",
+      hora_acoplagem: r.hora_acoplagem ? new Date(r.hora_acoplagem).toISOString().slice(0, 16) : "",
+      hora_inicio_descarga: r.hora_inicio_descarga ? new Date(r.hora_inicio_descarga).toISOString().slice(0, 16) : "",
+      hora_fim_descarga: r.hora_fim_descarga ? new Date(r.hora_fim_descarga).toISOString().slice(0, 16) : "",
+      hora_desacoplagem: r.hora_desacoplagem ? new Date(r.hora_desacoplagem).toISOString().slice(0, 16) : "",
     });
     setEditRecModal(r);
   };
@@ -89,7 +93,7 @@ const HistoricoPage = () => {
     const newValor = Number(editRecForm.valor_cobrado) || 0;
     const oldValor = Number(editRecModal.valor_cobrado) || 0;
 
-    const { error } = await supabase.from("recebimentos").update({
+    const updateData: any = {
       numero_nf: editRecForm.numero_nf,
       fornecedor: editRecForm.fornecedor,
       quantidade_volumes: Number(editRecForm.quantidade_volumes),
@@ -102,14 +106,20 @@ const HistoricoPage = () => {
       pallets_descarregados: Number(editRecForm.pallets_descarregados) || 0,
       toneladas: Number(editRecForm.toneladas) || 0,
       tipo_descarga: editRecForm.tipo_descarga || null,
-    }).eq("id", editRecModal.id);
+    };
+
+    // Update timestamps if admin edited them
+    if (editRecForm.hora_chegada) updateData.hora_chegada = new Date(editRecForm.hora_chegada).toISOString();
+    if (editRecForm.hora_acoplagem) updateData.hora_acoplagem = new Date(editRecForm.hora_acoplagem).toISOString();
+    if (editRecForm.hora_inicio_descarga) updateData.hora_inicio_descarga = new Date(editRecForm.hora_inicio_descarga).toISOString();
+    if (editRecForm.hora_fim_descarga) updateData.hora_fim_descarga = new Date(editRecForm.hora_fim_descarga).toISOString();
+    if (editRecForm.hora_desacoplagem) updateData.hora_desacoplagem = new Date(editRecForm.hora_desacoplagem).toISOString();
+
+    const { error } = await supabase.from("recebimentos").update(updateData).eq("id", editRecModal.id);
     if (error) { toast.error(error.message); return; }
 
-    // Update fluxo_financeiro if valor changed
     if (newValor !== oldValor) {
-      // Remove old entry if exists
       await supabase.from("fluxo_financeiro").delete().eq("recebimento_id", editRecModal.id);
-      // Insert new if valor > 0
       if (newValor > 0) {
         await supabase.from("fluxo_financeiro").insert([{
           tipo: "ENTRADA",
@@ -124,6 +134,43 @@ const HistoricoPage = () => {
     toast.success("Registro atualizado!");
     setEditRecModal(null);
     fetchAll();
+  };
+
+  const openEditArm = (a: any) => {
+    setEditArmForm({
+      hora_inicio: a.hora_inicio ? new Date(a.hora_inicio).toISOString().slice(0, 16) : "",
+      hora_fim: a.hora_fim ? new Date(a.hora_fim).toISOString().slice(0, 16) : "",
+      observacoes_armazenagem: a.observacoes_armazenagem || "",
+    });
+    setEditArmModal(a);
+  };
+
+  const handleEditArm = async () => {
+    if (!editArmModal) return;
+    const updateData: any = {
+      observacoes_armazenagem: editArmForm.observacoes_armazenagem || null,
+    };
+    if (editArmForm.hora_inicio) updateData.hora_inicio = new Date(editArmForm.hora_inicio).toISOString();
+    if (editArmForm.hora_fim) updateData.hora_fim = new Date(editArmForm.hora_fim).toISOString();
+
+    const { error } = await supabase.from("armazenagem").update(updateData).eq("id", editArmModal.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Armazenagem atualizada!");
+    setEditArmModal(null);
+    fetchAll();
+  };
+
+  const renderNFs = (nf: string) => {
+    if (nf.includes("/")) {
+      return (
+        <span className="flex flex-wrap gap-1 items-center">
+          {nf.split(/\s*\/\s*/).map((n: string, i: number) => (
+            <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">NF {formatNF(n.trim())}</span>
+          ))}
+        </span>
+      );
+    }
+    return <>NF {formatNF(nf)}</>;
   };
 
   return (
@@ -146,170 +193,136 @@ const HistoricoPage = () => {
         <TabsContent value="recebimentos" className="space-y-2 mt-4">
           {filteredRec.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">Nenhum registro encontrado</p>
-          ) : filteredRec.map(r => {
-            const isExpanded = expandedId === r.id;
-            return (
-              <div key={r.id} className="rounded-lg border border-border bg-card/40">
-                <div className="p-3 flex items-center justify-between cursor-pointer hover:bg-secondary/20" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-heading text-foreground">
-                        {r.numero_nf.includes("/") ? (
-                          <span className="flex flex-wrap gap-1 items-center">
-                            {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
-                              <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">
-                                NF {formatNF(nf.trim())}
-                              </span>
-                            ))}
-                          </span>
-                        ) : (
-                          <>NF {formatNF(r.numero_nf)}</>
-                        )}
-                      </span>
-                      <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
-                      {r.is_retirada && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">RETIRADA</span>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{r.fornecedor} · {formatDate(r.data_prevista)} · {r.usuario_responsavel}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {r.valor_cobrado > 0 && <span className="text-sm font-heading text-primary">R$ {Number(r.valor_cobrado).toFixed(2)}</span>}
-                    {isAdmin && (
-                      <>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditRec(r); }} className="text-muted-foreground hover:text-foreground">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteRec(r.id); }} className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                    {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="px-3 pb-3 border-t border-border/50 space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm mt-3">
-                      <div><span className="text-muted-foreground">Volumes:</span> <span className="text-foreground">{r.quantidade_volumes || 0} caixas</span></div>
-                      <div><span className="text-muted-foreground">Itens:</span> <span className="text-foreground">{r.quantidade_itens || 0}</span></div>
-                      <div><span className="text-muted-foreground">Resp:</span> <span className="text-foreground">{r.usuario_responsavel || "-"}</span></div>
-                    </div>
-
-                    {!r.is_retirada && (
-                      <div className="p-3 rounded-lg bg-secondary/30 space-y-2">
-                        <h4 className="font-heading text-sm text-primary">⏱ Cronômetro de Descarga</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                          {r.hora_chegada && (
-                            <div className="flex justify-between p-2 rounded bg-card/50">
-                              <span className="text-muted-foreground">📍 Chegada:</span>
-                              <span className="text-foreground font-medium">{formatTime(r.hora_chegada)}</span>
-                            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredRec.map(r => {
+                const isExpanded = expandedId === r.id;
+                return (
+                  <div key={r.id} className="rounded-xl border border-border bg-card/60 backdrop-blur-sm">
+                    <div className="p-3 cursor-pointer hover:bg-secondary/20" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-heading text-foreground text-sm">{renderNFs(r.numero_nf)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                            {r.is_retirada && <span className="text-xs px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-400">RET</span>}
+                            {r.is_marketing && <span className="text-xs px-1 py-0.5 rounded bg-purple-500/20 text-purple-400">MKT</span>}
+                            {r.is_encaixe && <span className="text-xs px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">ENC</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{r.fornecedor} · {formatDate(r.data_prevista)}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {r.valor_cobrado > 0 && <span className="text-xs font-heading text-primary">R$ {Number(r.valor_cobrado).toFixed(2)}</span>}
+                          {isAdmin && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditRec(r); }} className="text-muted-foreground hover:text-foreground h-7 w-7">
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDeleteRec(r.id); }} className="text-destructive hover:text-destructive h-7 w-7">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </>
                           )}
-                          {r.hora_chegada && r.hora_acoplagem && (
-                            <div className="flex justify-between p-2 rounded bg-card/50">
-                              <span className="text-muted-foreground">🚛 Tempo para acoplar:</span>
-                              <span className="text-foreground font-medium">{calcDuration(r.hora_chegada, r.hora_acoplagem)}</span>
-                            </div>
-                          )}
-                          {r.hora_inicio_descarga && r.hora_fim_descarga && (
-                            <div className="flex justify-between p-2 rounded bg-card/50">
-                              <span className="text-muted-foreground">📦 Tempo de descarga:</span>
-                              <span className="text-foreground font-medium">{calcDuration(r.hora_inicio_descarga, r.hora_fim_descarga)}</span>
-                            </div>
-                          )}
-                          {r.hora_fim_descarga && r.hora_desacoplagem && (
-                            <div className="flex justify-between p-2 rounded bg-card/50">
-                              <span className="text-muted-foreground">🔍 Conferência até liberação:</span>
-                              <span className="text-foreground font-medium">{calcDuration(r.hora_fim_descarga, r.hora_desacoplagem)}</span>
-                            </div>
-                          )}
+                          {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                         </div>
                       </div>
-                    )}
-
-                    {(r.caixas_batidas > 0 || r.pallets_descarregados > 0 || r.toneladas > 0) && (
-                      <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-1 text-sm">
-                        <h4 className="font-heading text-sm text-primary">💰 Valor Cobrado</h4>
-                        {r.caixas_batidas > 0 && <p className="text-foreground">Caixas batidas: {r.caixas_batidas}</p>}
-                        {r.pallets_descarregados > 0 && <p className="text-foreground">Pallets descarregados: {r.pallets_descarregados}</p>}
-                        {r.toneladas > 0 && <p className="text-foreground">Toneladas: {r.toneladas}</p>}
-                        {r.tipo_descarga && <p className="text-foreground">Tipo: {r.tipo_descarga}</p>}
-                        <p className="font-heading text-lg text-primary">Total: R$ {Number(r.valor_cobrado).toFixed(2)}</p>
-                      </div>
-                    )}
-
-                    {r.observacoes && (
-                      <div className="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 space-y-1 text-sm">
-                        <h4 className="font-heading text-sm text-yellow-400">📝 Observações</h4>
-                        <p className="text-foreground whitespace-pre-wrap">{r.observacoes}</p>
-                      </div>
-                    )}
-
-                    {r.nfd_numero && (
-                      <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 space-y-1 text-sm">
-                        <h4 className="font-heading text-sm text-red-400">📄 NFD (Nota Fiscal de Devolução)</h4>
-                        <p className="text-foreground">{formatNF(r.nfd_numero)}</p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-                      <div>Chegada: {formatTime(r.hora_chegada)}</div>
-                      <div>Acoplou: {formatTime(r.hora_acoplagem)}</div>
-                      <div>Início Desc.: {formatTime(r.hora_inicio_descarga)}</div>
-                      <div>Fim Desc.: {formatTime(r.hora_fim_descarga)}</div>
-                      <div>Desacoplou: {formatTime(r.hora_desacoplagem)}</div>
                     </div>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3 border-t border-border/50 space-y-3">
+                        <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+                          <div><span className="text-muted-foreground">Volumes:</span> <span className="text-foreground">{r.quantidade_volumes || 0}</span></div>
+                          <div><span className="text-muted-foreground">Resp:</span> <span className="text-foreground">{r.usuario_responsavel || "-"}</span></div>
+                        </div>
+
+                        {!r.is_retirada && !r.is_marketing && (
+                          <div className="p-3 rounded-lg bg-secondary/30 space-y-2">
+                            <h4 className="font-heading text-sm text-primary">⏱ Cronômetro</h4>
+                            <div className="grid grid-cols-1 gap-1.5 text-sm">
+                              {r.hora_chegada && (
+                                <div className="flex justify-between p-1.5 rounded bg-card/50">
+                                  <span className="text-muted-foreground text-xs">📍 Chegada:</span>
+                                  <span className="text-foreground text-xs font-medium">{formatTime(r.hora_chegada)}</span>
+                                </div>
+                              )}
+                              {r.hora_chegada && r.hora_acoplagem && (
+                                <div className="flex justify-between p-1.5 rounded bg-card/50">
+                                  <span className="text-muted-foreground text-xs">🚛 Tempo p/ acoplar:</span>
+                                  <span className="text-foreground text-xs font-medium">{calcDuration(r.hora_chegada, r.hora_acoplagem)}</span>
+                                </div>
+                              )}
+                              {r.hora_inicio_descarga && r.hora_fim_descarga && (
+                                <div className="flex justify-between p-1.5 rounded bg-card/50">
+                                  <span className="text-muted-foreground text-xs">📦 Tempo descarga:</span>
+                                  <span className="text-foreground text-xs font-medium">{calcDuration(r.hora_inicio_descarga, r.hora_fim_descarga)}</span>
+                                </div>
+                              )}
+                              {r.hora_fim_descarga && r.hora_desacoplagem && (
+                                <div className="flex justify-between p-1.5 rounded bg-card/50">
+                                  <span className="text-muted-foreground text-xs">🔍 Conferência:</span>
+                                  <span className="text-foreground text-xs font-medium">{calcDuration(r.hora_fim_descarga, r.hora_desacoplagem)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {r.valor_cobrado > 0 && (
+                          <div className="p-2 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                            <p className="font-heading text-primary">Total: R$ {Number(r.valor_cobrado).toFixed(2)}</p>
+                          </div>
+                        )}
+
+                        {r.observacoes && <p className="text-xs text-yellow-400">📝 {r.observacoes}</p>}
+                        {r.nfd_numero && <p className="text-xs text-red-400">📄 NFD: {formatNF(r.nfd_numero)}</p>}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="armazenagem" className="space-y-2 mt-4">
           {armazenagens.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">Nenhum registro encontrado</p>
-          ) : armazenagens.map(a => (
-            <div key={a.id} className="p-3 rounded-lg border border-border bg-card/40">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-heading text-foreground">
-                      {a.recebimentos?.numero_nf?.includes("/") ? (
-                        <span className="flex flex-wrap gap-1 items-center">
-                          {a.recebimentos.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
-                            <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">
-                              NF {formatNF(nf.trim())}
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        <>NF {a.recebimentos?.numero_nf ? formatNF(a.recebimentos.numero_nf) : "-"}</>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {armazenagens.map(a => (
+                <div key={a.id} className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-heading text-foreground text-sm">{renderNFs(a.recebimentos?.numero_nf || "-")}</span>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={`status-badge ${getStatusClass(a.status)}`}>{a.status}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{a.recebimentos?.fornecedor} · {a.usuario_responsavel}</p>
+                      {a.hora_inicio && a.hora_fim && (
+                        <p className="text-xs text-primary mt-1">
+                          ⏱ {calcEffectiveArmazenagemTime(a)}
+                          {(a.pausas || []).length > 0 && ` (${(a.pausas || []).length} pausa(s))`}
+                        </p>
                       )}
-                    </span>
-                    <span className={`status-badge ${getStatusClass(a.status)}`}>{a.status}</span>
+                      {a.observacoes_armazenagem && <p className="text-xs text-yellow-400 mt-1">📝 {a.observacoes_armazenagem}</p>}
+                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEditArm(a)} className="text-muted-foreground hover:text-foreground h-7 w-7">
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteArm(a.id)} className="text-destructive hover:text-destructive h-7 w-7">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {a.recebimentos?.fornecedor} · {a.usuario_responsavel} · {formatDateTime(a.data_criacao)}
-                  </p>
-                  {a.hora_inicio && a.hora_fim && (
-                    <p className="text-xs text-primary mt-1">
-                      ⏱ Tempo efetivo: {calcEffectiveArmazenagemTime(a)}
-                      {(a.pausas || []).length > 0 && ` (${(a.pausas || []).length} pausa(s))`}
-                    </p>
-                  )}
-                  {a.observacoes_armazenagem && (
-                    <p className="text-xs text-yellow-400 mt-1">📝 {a.observacoes_armazenagem}</p>
-                  )}
                 </div>
-                {isAdmin && (
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteArm(a.id)} className="text-destructive hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </TabsContent>
       </Tabs>
 
@@ -321,17 +334,46 @@ const HistoricoPage = () => {
             <Input placeholder="Número NF" value={editRecForm.numero_nf || ""} onChange={e => setEditRecForm({...editRecForm, numero_nf: e.target.value})} className="bg-secondary" />
             <Input placeholder="Fornecedor" value={editRecForm.fornecedor || ""} onChange={e => setEditRecForm({...editRecForm, fornecedor: e.target.value})} className="bg-secondary" />
             <Input type="text" inputMode="numeric" placeholder="Volumes" value={editRecForm.quantidade_volumes || ""} onChange={e => setEditRecForm({...editRecForm, quantidade_volumes: e.target.value})} className="bg-secondary" />
-            <div>
-              <label className="text-xs text-muted-foreground">Data Prevista</label>
-              <Input type="date" value={editRecForm.data_prevista || ""} onChange={e => setEditRecForm({...editRecForm, data_prevista: e.target.value})} className="bg-secondary mt-1" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Horário</label>
-              <Input type="time" value={editRecForm.horario_agenda || ""} onChange={e => setEditRecForm({...editRecForm, horario_agenda: e.target.value})} className="bg-secondary mt-1" />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Data Prevista</label>
+                <Input type="date" value={editRecForm.data_prevista || ""} onChange={e => setEditRecForm({...editRecForm, data_prevista: e.target.value})} className="bg-secondary mt-1" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Horário</label>
+                <Input type="time" value={editRecForm.horario_agenda || ""} onChange={e => setEditRecForm({...editRecForm, horario_agenda: e.target.value})} className="bg-secondary mt-1" />
+              </div>
             </div>
             <Textarea placeholder="Observações" value={editRecForm.observacoes || ""} onChange={e => setEditRecForm({...editRecForm, observacoes: e.target.value})} className="bg-secondary" rows={2} />
             <Input placeholder="NFD" value={editRecForm.nfd_numero || ""} onChange={e => setEditRecForm({...editRecForm, nfd_numero: e.target.value})} className="bg-secondary" />
-            
+
+            {/* Timestamps edit - Admin only */}
+            <div className="border-t border-border pt-3">
+              <h4 className="text-sm font-heading text-primary mb-2">⏱ Horários (Admin)</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">Chegada</label>
+                  <Input type="datetime-local" value={editRecForm.hora_chegada || ""} onChange={e => setEditRecForm({...editRecForm, hora_chegada: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Acoplagem</label>
+                  <Input type="datetime-local" value={editRecForm.hora_acoplagem || ""} onChange={e => setEditRecForm({...editRecForm, hora_acoplagem: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Início Descarga</label>
+                  <Input type="datetime-local" value={editRecForm.hora_inicio_descarga || ""} onChange={e => setEditRecForm({...editRecForm, hora_inicio_descarga: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Fim Descarga</label>
+                  <Input type="datetime-local" value={editRecForm.hora_fim_descarga || ""} onChange={e => setEditRecForm({...editRecForm, hora_fim_descarga: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Desacoplagem</label>
+                  <Input type="datetime-local" value={editRecForm.hora_desacoplagem || ""} onChange={e => setEditRecForm({...editRecForm, hora_desacoplagem: e.target.value})} className="bg-secondary mt-1" />
+                </div>
+              </div>
+            </div>
+
             <div className="border-t border-border pt-3">
               <h4 className="text-sm font-heading text-primary mb-2">💰 Cobrança</h4>
               <div>
@@ -353,8 +395,28 @@ const HistoricoPage = () => {
                 </div>
               </div>
             </div>
-            
+
             <Button onClick={handleEditRec} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Atualizar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit armazenagem modal - Admin only */}
+      <Dialog open={!!editArmModal} onOpenChange={(open) => { if (!open) setEditArmModal(null); }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Editar Armazenagem</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{editArmModal?.recebimentos?.fornecedor}</p>
+            <div>
+              <label className="text-xs text-muted-foreground">Início Armazenagem</label>
+              <Input type="datetime-local" value={editArmForm.hora_inicio || ""} onChange={e => setEditArmForm({...editArmForm, hora_inicio: e.target.value})} className="bg-secondary mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Fim Armazenagem</label>
+              <Input type="datetime-local" value={editArmForm.hora_fim || ""} onChange={e => setEditArmForm({...editArmForm, hora_fim: e.target.value})} className="bg-secondary mt-1" />
+            </div>
+            <Textarea placeholder="Observações" value={editArmForm.observacoes_armazenagem || ""} onChange={e => setEditArmForm({...editArmForm, observacoes_armazenagem: e.target.value})} className="bg-secondary" rows={2} />
+            <Button onClick={handleEditArm} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Atualizar</Button>
           </div>
         </DialogContent>
       </Dialog>
