@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
-  ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell, Activity, DoorOpen, Ban
+  ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell, Activity, Car, DoorOpen, Ban, DollarSign
 } from "lucide-react";
 
 const allNavItems = [
@@ -29,8 +29,9 @@ const allNavItems = [
   { label: "Histórico", icon: History, path: "/historico", page: "historico" },
   { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios" },
   { label: "Não Vieram", icon: Ban, path: "/naovieram", page: "naovieram" },
-  { label: "Portaria", icon: DoorOpen, path: "/portaria", page: "portaria" },
+  { label: "Cad. Veículos", icon: Car, path: "/portaria", page: "portaria" },
   { label: "Hist. Portaria", icon: DoorOpen, path: "/portaria-historico", page: "portaria_historico" },
+  { label: "Valores", icon: DollarSign, path: "/valores", page: "valores" },
   { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
   { label: "Permissões", icon: Shield, path: "/permissoes", page: "permissoes" },
 ];
@@ -48,23 +49,15 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
   useInactivityTimeout();
 
-  // Check for urgent suppliers alert on Mondays, 3rd week+
   useEffect(() => {
     const checkAlert = async () => {
       const today = new Date();
-      const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon
+      const dayOfWeek = today.getDay();
       const dayOfMonth = today.getDate();
-      
-      // Only show on Monday, from 3rd week (day >= 15)
       if (dayOfWeek !== 1 || dayOfMonth < 15) return;
-      
-      // Only for Agenda and Compra permissions
       if (!hasAccess("agenda") && !hasAccess("compras") && !isAdmin) return;
-
-      // Check if already dismissed today
       const dismissedKey = `urgent_alert_${today.toISOString().split("T")[0]}`;
       if (localStorage.getItem(dismissedKey)) return;
-
       const { data } = await supabase.from("fornecedores_urgencia").select("nome_fornecedor").order("contagem_urgencias", { ascending: false });
       if (data && data.length > 0) {
         setUrgentFornecedores(data.map((f: any) => f.nome_fornecedor));
@@ -99,9 +92,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     return hasAccess(item.page);
   });
 
-  // Admin-only hidden nav item for activities
-  const showActivities = isAdmin;
-
   return (
     <div className="min-h-screen bg-background relative">
       <ParticlesBackground />
@@ -133,18 +123,18 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       </header>
 
       <div className="flex">
-        <aside className="hidden lg:flex flex-col w-56 min-h-[calc(100vh-3.5rem)] border-r border-border bg-card/50 backdrop-blur-sm p-3 gap-1 relative z-10">
+        <aside className="hidden lg:flex flex-col w-56 min-h-[calc(100vh-3.5rem)] border-r border-border bg-card/50 backdrop-blur-sm p-3 gap-1 relative z-10 overflow-y-auto">
           {filteredNav.map(item => {
             const active = location.pathname === item.path;
             return (
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   active ? "bg-primary/15 text-primary neon-border" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 }`}
               >
-                <item.icon size={18} />
+                <item.icon size={16} />
                 {item.label}
               </button>
             );
@@ -154,7 +144,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         {mobileOpen && (
           <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileOpen(false)}>
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
-            <aside className="absolute left-0 top-14 bottom-0 w-64 border-r border-border bg-card p-3 space-y-1" onClick={e => e.stopPropagation()}>
+            <aside className="absolute left-0 top-14 bottom-0 w-64 border-r border-border bg-card p-3 space-y-1 overflow-y-auto" onClick={e => e.stopPropagation()}>
               {filteredNav.map(item => {
                 const active = location.pathname === item.path;
                 return (
@@ -181,7 +171,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
       <GlobalMessageListener />
 
-      {/* Send message dialog */}
       <Dialog open={msgOpen} onOpenChange={setMsgOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Enviar Mensagem Global</DialogTitle></DialogHeader>
@@ -194,7 +183,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Urgent suppliers alert */}
       <Dialog open={urgentAlert} onOpenChange={(open) => { if (!open) dismissAlert(); }}>
         <DialogContent className="bg-card border-red-500/30">
           <DialogHeader>

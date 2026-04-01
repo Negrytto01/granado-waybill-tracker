@@ -18,7 +18,7 @@ const allPages = [
   { key: "historico", label: "Histórico" },
   { key: "relatorios", label: "Relatórios" },
   { key: "naovieram", label: "Não Compareceram / Multas" },
-  { key: "portaria", label: "Portaria" },
+  { key: "portaria", label: "Cadastro Veículos" },
   { key: "portaria_historico", label: "Histórico Portaria" },
   { key: "valores", label: "Valores Descarga" },
   { key: "usuarios", label: "Usuários" },
