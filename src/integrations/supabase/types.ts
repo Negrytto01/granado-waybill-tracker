@@ -418,6 +418,8 @@ export type Database = {
           hora_inicio_descarga: string | null
           horario_agenda: string | null
           id: string
+          is_encaixe: boolean
+          is_marketing: boolean
           is_pallet: boolean
           is_retirada: boolean
           motorista: string | null
@@ -449,6 +451,8 @@ export type Database = {
           hora_inicio_descarga?: string | null
           horario_agenda?: string | null
           id?: string
+          is_encaixe?: boolean
+          is_marketing?: boolean
           is_pallet?: boolean
           is_retirada?: boolean
           motorista?: string | null
@@ -480,6 +484,8 @@ export type Database = {
           hora_inicio_descarga?: string | null
           horario_agenda?: string | null
           id?: string
+          is_encaixe?: boolean
+          is_marketing?: boolean
           is_pallet?: boolean
           is_retirada?: boolean
           motorista?: string | null
