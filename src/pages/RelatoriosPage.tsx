@@ -9,6 +9,7 @@ interface FornecedorStats {
   fornecedor: string;
   volumes: number;
   descargas: number;
+  valorDescarga: number;
   prevMonthVolumes?: number;
   prevMonthDescargas?: number;
 }
@@ -31,7 +32,7 @@ const RelatoriosPage = () => {
     const prevEndDate = new Date(prevYear, prevMonth, 0).toISOString().split("T")[0];
 
     // Current month data
-    const { data: currentRecs } = await supabase.from("recebimentos").select("fornecedor, quantidade_volumes")
+    const { data: currentRecs } = await supabase.from("recebimentos").select("fornecedor, quantidade_volumes, valor_cobrado")
       .gte("data_prevista", startDate)
       .lte("data_prevista", endDate)
       .not("status", "eq", "NAO_VEIO");
@@ -60,12 +61,13 @@ const RelatoriosPage = () => {
     }
 
     // Current month aggregation
-    const currentMap: Record<string, { volumes: number; descargas: number }> = {};
+    const currentMap: Record<string, { volumes: number; descargas: number; valor: number }> = {};
     (currentRecs || []).forEach(r => {
       const name = r.fornecedor || "N/A";
-      if (!currentMap[name]) currentMap[name] = { volumes: 0, descargas: 0 };
+      if (!currentMap[name]) currentMap[name] = { volumes: 0, descargas: 0, valor: 0 };
       currentMap[name].volumes += r.quantidade_volumes || 0;
       currentMap[name].descargas++;
+      currentMap[name].valor += Number(r.valor_cobrado) || 0;
     });
 
     const allFornecedores = [...new Set([...Object.keys(currentMap), ...Object.keys(prevMap)])].sort();
@@ -73,6 +75,7 @@ const RelatoriosPage = () => {
       fornecedor: f,
       volumes: currentMap[f]?.volumes || 0,
       descargas: currentMap[f]?.descargas || 0,
+      valorDescarga: currentMap[f]?.valor || 0,
       prevMonthVolumes: prevMap[f]?.volumes || 0,
       prevMonthDescargas: prevMap[f]?.descargas || 0,
     })).filter(f => f.volumes > 0 || f.descargas > 0);
@@ -127,6 +130,7 @@ const RelatoriosPage = () => {
 
   const totalVolumes = stats.reduce((s, f) => s + f.volumes, 0);
   const totalDescargas = stats.reduce((s, f) => s + f.descargas, 0);
+  const totalValor = stats.reduce((s, f) => s + f.valorDescarga, 0);
 
   if (loading) {
     return (
@@ -150,7 +154,7 @@ const RelatoriosPage = () => {
       </div>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm">
           <span className="text-xs text-muted-foreground uppercase">Total Volumes</span>
           <p className="font-heading text-3xl text-primary">{totalVolumes}</p>
@@ -158,6 +162,10 @@ const RelatoriosPage = () => {
         <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm">
           <span className="text-xs text-muted-foreground uppercase">Total Descargas</span>
           <p className="font-heading text-3xl text-primary">{totalDescargas}</p>
+        </div>
+        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground uppercase">Valor Descarga</span>
+          <p className="font-heading text-3xl text-primary">R$ {totalValor.toFixed(2)}</p>
         </div>
       </div>
 
@@ -195,6 +203,10 @@ const RelatoriosPage = () => {
                       </div>
                     )}
                   </div>
+                </div>
+                <div className="pt-2 border-t border-border">
+                  <span className="text-xs text-muted-foreground">Valor Descarga</span>
+                  <p className="font-heading text-lg text-emerald-400">R$ {f.valorDescarga.toFixed(2)}</p>
                 </div>
               </div>
             );
