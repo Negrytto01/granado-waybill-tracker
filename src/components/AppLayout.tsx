@@ -91,6 +91,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
   const filteredNav = allNavItems.filter(item => {
     if (item.path === "/permissoes") return isAdmin;
+    if ((item as any).masterOnly) return isAdmin;
     return hasAccess(item.page);
   });
 
