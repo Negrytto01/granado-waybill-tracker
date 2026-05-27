@@ -1,0 +1,250 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Navigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Copy, Plus, Trash2, Ban, Check } from "lucide-react";
+import { toast } from "sonner";
+
+const RESOURCES = [
+  "recebimentos", "armazenagem", "solicitacoes_compras",
+  "fornecedores_urgencia", "fornecedores_nao_vieram",
+  "portaria_registros", "veiculos", "motoristas",
+  "ocorrencias_armazenagem", "ocorrencias_tipos",
+  "fluxo_financeiro", "valores_descarga", "relatorios_mensais",
+  "etiquetas_pallet",
+];
+
+const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-api/v1`;
+
+export default function ApiKeysPage() {
+  const { isAdmin } = usePermissions();
+  const [keys, setKeys] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [openNew, setOpenNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newRead, setNewRead] = useState<string[]>([]);
+  const [newWrite, setNewWrite] = useState<string[]>([]);
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+
+  const load = async () => {
+    const [k, l] = await Promise.all([
+      supabase.from("api_keys").select("*").order("data_criacao", { ascending: false }),
+      supabase.from("api_logs").select("*").order("data_criacao", { ascending: false }).limit(100),
+    ]);
+    setKeys(k.data || []);
+    setLogs(l.data || []);
+  };
+
+  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+
+  if (!isAdmin) return <Navigate to="/" replace />;
+
+  const toggleRes = (list: string[], set: (v: string[]) => void, r: string) => {
+    set(list.includes(r) ? list.filter(x => x !== r) : [...list, r]);
+  };
+
+  const createKey = async () => {
+    if (!newName.trim()) { toast.error("Informe o nome"); return; }
+    const { data, error } = await supabase.functions.invoke("api-keys-admin", {
+      body: { action: "create", payload: { nome: newName, permissoes: { read: newRead, write: newWrite } } },
+    });
+    if (error || data?.error) { toast.error(data?.error || error?.message || "Erro"); return; }
+    setCreatedKey(data.key);
+    setNewName(""); setNewRead([]); setNewWrite([]);
+    load();
+  };
+
+  const toggleActive = async (k: any) => {
+    await supabase.from("api_keys").update({ ativo: !k.ativo }).eq("id", k.id);
+    load();
+  };
+
+  const deleteKey = async (id: string) => {
+    if (!confirm("Excluir esta chave? Sistemas que a usam vão parar de funcionar.")) return;
+    await supabase.from("api_keys").delete().eq("id", id);
+    load();
+  };
+
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copiado!");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-2xl neon-text">API & Integrações</h1>
+        <Button onClick={() => setOpenNew(true)} className="gap-2"><Plus size={16} /> Nova Chave</Button>
+      </div>
+
+      <Tabs defaultValue="keys">
+        <TabsList>
+          <TabsTrigger value="keys">Chaves ({keys.length})</TabsTrigger>
+          <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
+          <TabsTrigger value="docs">Documentação</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="keys" className="space-y-3 mt-4">
+          {keys.length === 0 && <Card className="p-6 text-center text-muted-foreground">Nenhuma chave criada ainda.</Card>}
+          {keys.map(k => (
+            <Card key={k.id} className="p-4 flex flex-col md:flex-row md:items-center gap-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{k.nome}</span>
+                  {k.ativo ? <Badge className="bg-emerald-500/20 text-emerald-300">Ativa</Badge> : <Badge variant="secondary">Revogada</Badge>}
+                </div>
+                <code className="text-xs text-muted-foreground">{k.key_prefix}…</code>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {k.total_chamadas} chamadas · Último uso: {k.ultimo_uso ? new Date(k.ultimo_uso).toLocaleString("pt-BR") : "nunca"}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Leitura: {(k.permissoes?.read || []).join(", ") || "—"} · Escrita: {(k.permissoes?.write || []).join(", ") || "—"}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => toggleActive(k)}>
+                  {k.ativo ? <><Ban size={14} className="mr-1" />Revogar</> : <><Check size={14} className="mr-1" />Reativar</>}
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => deleteKey(k.id)}><Trash2 size={14} /></Button>
+              </div>
+            </Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="logs" className="space-y-2 mt-4">
+          {logs.length === 0 && <Card className="p-6 text-center text-muted-foreground">Nenhuma chamada registrada.</Card>}
+          {logs.map(l => (
+            <Card key={l.id} className="p-3 text-sm flex flex-wrap items-center gap-3">
+              <Badge variant={l.status_code < 300 ? "default" : "destructive"}>{l.status_code}</Badge>
+              <span className="font-mono text-xs">{l.method}</span>
+              <span className="font-mono text-xs flex-1 truncate">{l.endpoint}</span>
+              <span className="text-xs text-muted-foreground">{l.api_key_nome}</span>
+              <span className="text-xs text-muted-foreground">{new Date(l.data_criacao).toLocaleString("pt-BR")}</span>
+            </Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="docs" className="mt-4 space-y-4">
+          <Card className="p-4 space-y-3">
+            <h3 className="font-heading text-lg">Como usar</h3>
+            <p className="text-sm text-muted-foreground">URL base:</p>
+            <code className="block bg-secondary p-2 rounded text-xs break-all">{API_BASE}</code>
+            <p className="text-sm text-muted-foreground mt-3">Header obrigatório em todas as chamadas:</p>
+            <code className="block bg-secondary p-2 rounded text-xs">x-api-key: gnd_live_xxxxxxxx...</code>
+          </Card>
+
+          <Card className="p-4 space-y-2">
+            <h3 className="font-heading text-lg">Exemplos</h3>
+            <p className="text-sm font-semibold mt-2">Listar recebimentos (paginado)</p>
+            <code className="block bg-secondary p-2 rounded text-xs whitespace-pre-wrap break-all">
+{`curl "${API_BASE}/recebimentos?page=1&limit=20" \\
+  -H "x-api-key: SUA_CHAVE"`}
+            </code>
+            <p className="text-sm font-semibold mt-3">Buscar com filtros</p>
+            <code className="block bg-secondary p-2 rounded text-xs whitespace-pre-wrap break-all">
+{`curl "${API_BASE}/recebimentos?fornecedor=eq.ACME&data_prevista=gte.2026-01-01" \\
+  -H "x-api-key: SUA_CHAVE"`}
+            </code>
+            <p className="text-sm font-semibold mt-3">Obter um registro</p>
+            <code className="block bg-secondary p-2 rounded text-xs whitespace-pre-wrap break-all">
+{`curl "${API_BASE}/recebimentos/<uuid>" -H "x-api-key: SUA_CHAVE"`}
+            </code>
+            <p className="text-sm font-semibold mt-3">Criar</p>
+            <code className="block bg-secondary p-2 rounded text-xs whitespace-pre-wrap break-all">
+{`curl -X POST "${API_BASE}/recebimentos" \\
+  -H "x-api-key: SUA_CHAVE" -H "Content-Type: application/json" \\
+  -d '{"fornecedor":"ACME","numero_nf":"123","data_prevista":"2026-06-01"}'`}
+            </code>
+            <p className="text-sm font-semibold mt-3">Atualizar</p>
+            <code className="block bg-secondary p-2 rounded text-xs whitespace-pre-wrap break-all">
+{`curl -X PATCH "${API_BASE}/recebimentos/<uuid>" \\
+  -H "x-api-key: SUA_CHAVE" -H "Content-Type: application/json" \\
+  -d '{"observacoes":"Atualizado via API"}'`}
+            </code>
+            <p className="text-sm font-semibold mt-3">Excluir</p>
+            <code className="block bg-secondary p-2 rounded text-xs whitespace-pre-wrap break-all">
+{`curl -X DELETE "${API_BASE}/recebimentos/<uuid>" -H "x-api-key: SUA_CHAVE"`}
+            </code>
+          </Card>
+
+          <Card className="p-4 space-y-2">
+            <h3 className="font-heading text-lg">Operadores de filtro</h3>
+            <p className="text-xs">Formato: <code>?coluna=operador.valor</code></p>
+            <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
+              <li><b>eq</b>, <b>neq</b> — igual / diferente</li>
+              <li><b>gt</b>, <b>gte</b>, <b>lt</b>, <b>lte</b> — maior/menor</li>
+              <li><b>like</b>, <b>ilike</b> — texto (use %)</li>
+              <li><b>in</b> — lista: <code>?id=in.(uuid1,uuid2)</code></li>
+              <li><b>order</b>: <code>?order=data_criacao.desc</code></li>
+            </ul>
+          </Card>
+
+          <Card className="p-4 space-y-2">
+            <h3 className="font-heading text-lg">Recursos disponíveis</h3>
+            <div className="flex flex-wrap gap-2">
+              {RESOURCES.map(r => <Badge key={r} variant="secondary">{r}</Badge>)}
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (!o) setCreatedKey(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{createdKey ? "Chave gerada — copie agora!" : "Nova Chave de API"}</DialogTitle></DialogHeader>
+          {createdKey ? (
+            <div className="space-y-3">
+              <p className="text-sm text-amber-400">Esta chave será mostrada apenas uma vez. Copie e guarde em local seguro.</p>
+              <div className="flex gap-2">
+                <code className="flex-1 bg-secondary p-3 rounded text-xs break-all">{createdKey}</code>
+                <Button onClick={() => copy(createdKey)}><Copy size={16} /></Button>
+              </div>
+              <Button onClick={() => { setOpenNew(false); setCreatedKey(null); }} className="w-full">Fechar</Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Label>Nome da integração</Label>
+                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ex.: ERP TOTVS" />
+              </div>
+              <div>
+                <Label>Permissões de Leitura</Label>
+                <div className="grid grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto p-2 bg-secondary/30 rounded">
+                  {RESOURCES.map(r => (
+                    <label key={"r"+r} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={newRead.includes(r)} onCheckedChange={() => toggleRes(newRead, setNewRead, r)} />
+                      {r}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label>Permissões de Escrita (criar/editar/excluir)</Label>
+                <div className="grid grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto p-2 bg-secondary/30 rounded">
+                  {RESOURCES.map(r => (
+                    <label key={"w"+r} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={newWrite.includes(r)} onCheckedChange={() => toggleRes(newWrite, setNewWrite, r)} />
+                      {r}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpenNew(false)}>Cancelar</Button>
+                <Button onClick={createKey}>Gerar Chave</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
