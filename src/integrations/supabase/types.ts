@@ -14,6 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          ativo: boolean
+          criado_por: string | null
+          criado_por_user_id: string | null
+          data_criacao: string
+          data_expiracao: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          nome: string
+          permissoes: Json
+          total_chamadas: number
+          ultimo_uso: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          criado_por?: string | null
+          criado_por_user_id?: string | null
+          data_criacao?: string
+          data_expiracao?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          nome: string
+          permissoes?: Json
+          total_chamadas?: number
+          ultimo_uso?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          criado_por?: string | null
+          criado_por_user_id?: string | null
+          data_criacao?: string
+          data_expiracao?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          nome?: string
+          permissoes?: Json
+          total_chamadas?: number
+          ultimo_uso?: string | null
+        }
+        Relationships: []
+      }
+      api_logs: {
+        Row: {
+          api_key_id: string | null
+          api_key_nome: string | null
+          data_criacao: string
+          endpoint: string
+          id: string
+          ip: string | null
+          method: string
+          payload_resumo: string | null
+          status_code: number
+          user_agent: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          api_key_nome?: string | null
+          data_criacao?: string
+          endpoint: string
+          id?: string
+          ip?: string | null
+          method: string
+          payload_resumo?: string | null
+          status_code: number
+          user_agent?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          api_key_nome?: string | null
+          data_criacao?: string
+          endpoint?: string
+          id?: string
+          ip?: string | null
+          method?: string
+          payload_resumo?: string | null
+          status_code?: number
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       armazenagem: {
         Row: {
           data_criacao: string
