@@ -24,6 +24,7 @@ import CadastroVeiculosPage from "@/pages/CadastroVeiculosPage";
 import HistPortariaPage from "@/pages/HistPortariaPage";
 import AtividadesAdminPage from "@/pages/AtividadesAdminPage";
 import FornecedoresNaoVieramPage from "@/pages/FornecedoresNaoVieramPage";
+import ApiKeysPage from "@/pages/ApiKeysPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/portaria-historico" element={<ProtectedRoute><HistPortariaPage /></ProtectedRoute>} />
             <Route path="/naovieram" element={<ProtectedRoute><FornecedoresNaoVieramPage /></ProtectedRoute>} />
             <Route path="/atividades" element={<ProtectedRoute><AtividadesAdminPage /></ProtectedRoute>} />
+            <Route path="/api" element={<ProtectedRoute><ApiKeysPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
