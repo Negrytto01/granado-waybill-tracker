@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import {
   LayoutDashboard, CalendarDays, Truck, Package, Users, History, LogOut, Menu, X, BarChart3,
   ShoppingCart, AlertTriangle, Wallet, Shield, Calendar, FileText, Send, Bell, Activity, Car, DoorOpen, Ban, DollarSign
+  , Code2
 } from "lucide-react";
 
 const allNavItems = [
@@ -34,6 +35,7 @@ const allNavItems = [
   { label: "Valores", icon: DollarSign, path: "/valores", page: "valores" },
   { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
   { label: "Permissões", icon: Shield, path: "/permissoes", page: "permissoes" },
+  { label: "API", icon: Code2, path: "/api", page: "api", masterOnly: true },
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
