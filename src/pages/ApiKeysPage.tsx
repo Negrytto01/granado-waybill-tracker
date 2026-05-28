@@ -184,8 +184,10 @@ export default function ApiKeysPage() {
       <Tabs defaultValue="keys">
         <TabsList>
           <TabsTrigger value="keys">Chaves ({keys.length})</TabsTrigger>
+          <TabsTrigger value="integracoes">Integrações ({integracoes.length})</TabsTrigger>
           <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           <TabsTrigger value="docs">Documentação</TabsTrigger>
+          <TabsTrigger value="swagger">Swagger</TabsTrigger>
         </TabsList>
 
         <TabsContent value="keys" className="space-y-3 mt-4">
