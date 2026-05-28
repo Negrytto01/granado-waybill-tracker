@@ -51,6 +51,11 @@ Deno.serve(async (req) => {
   const resource = parts[vIdx + 1];
   const recordId = parts[vIdx + 2];
 
+  // OpenAPI spec — public, no auth
+  if (resource === "openapi.json") {
+    return jsonResponse(buildOpenApiSpec(url.origin + url.pathname.replace(/\/openapi\.json.*$/, "")));
+  }
+
   // Authentication
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) return jsonResponse({ error: "Header x-api-key obrigatório" }, 401);
