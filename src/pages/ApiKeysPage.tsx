@@ -13,6 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Plus, Trash2, Ban, Check } from "lucide-react";
 import { toast } from "sonner";
+import SwaggerUI from "swagger-ui-react";
+import "swagger-ui-react/swagger-ui.css";
 
 const RESOURCES = [
   "recebimentos", "armazenagem", "solicitacoes_compras",
@@ -24,6 +26,48 @@ const RESOURCES = [
 ];
 
 const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-api/v1`;
+const OPENAPI_URL = `${API_BASE}/openapi.json`;
+const WEBHOOK_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/external-webhook`;
+
+const ERP_TEMPLATES: Record<string, { auth_tipo: string; auth_config: any; endpoints: any; base_url: string }> = {
+  totvs: {
+    base_url: "https://seu-totvs.com.br/rest",
+    auth_tipo: "oauth2",
+    auth_config: { token_url: "https://seu-totvs.com.br/api/oauth2/v1/token", client_id: "", client_secret: "", grant_type: "password", scope: "" },
+    endpoints: {
+      sincronizar_fornecedores: { metodo: "GET", path: "/fwmodel/SA2/items" },
+      enviar_recebimento: { metodo: "POST", path: "/fwmodel/SF1/items" },
+      sincronizar_produtos: { metodo: "GET", path: "/fwmodel/SB1/items" },
+      webhook_map: { fornecedor_atualizado: { tabela: "recebimentos", mapeamento: { fornecedor: "A2_NOME", cnpj: "A2_CGC" } } },
+    },
+  },
+  sap: {
+    base_url: "https://seu-sap:50000/b1s/v1",
+    auth_tipo: "cookie",
+    auth_config: { login_url: "https://seu-sap:50000/b1s/v1/Login", login_body: { CompanyDB: "SBODEMO", UserName: "manager", Password: "" } },
+    endpoints: {
+      sincronizar_fornecedores: { metodo: "GET", path: "/BusinessPartners?$filter=CardType eq 'cSupplier'" },
+      enviar_recebimento: { metodo: "POST", path: "/PurchaseDeliveryNotes" },
+      sincronizar_produtos: { metodo: "GET", path: "/Items" },
+    },
+  },
+  bling: {
+    base_url: "https://api.bling.com.br/Api/v3",
+    auth_tipo: "bearer",
+    auth_config: { token: "" },
+    endpoints: {
+      sincronizar_fornecedores: { metodo: "GET", path: "/contatos?tipo=F" },
+      enviar_recebimento: { metodo: "POST", path: "/notasfiscais" },
+      sincronizar_produtos: { metodo: "GET", path: "/produtos" },
+    },
+  },
+  generico: {
+    base_url: "https://api.exemplo.com",
+    auth_tipo: "bearer",
+    auth_config: { token: "" },
+    endpoints: {},
+  },
+};
 
 export default function ApiKeysPage() {
   const { isAdmin } = usePermissions();
@@ -34,14 +78,24 @@ export default function ApiKeysPage() {
   const [newRead, setNewRead] = useState<string[]>([]);
   const [newWrite, setNewWrite] = useState<string[]>([]);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [integracoes, setIntegracoes] = useState<any[]>([]);
+  const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [openInteg, setOpenInteg] = useState(false);
+  const [integForm, setIntegForm] = useState<any>({ nome: "", tipo: "totvs", ...ERP_TEMPLATES.totvs, webhook_secret: "" });
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testing, setTesting] = useState<string | null>(null);
 
   const load = async () => {
-    const [k, l] = await Promise.all([
+    const [k, l, i, s] = await Promise.all([
       supabase.from("api_keys").select("*").order("data_criacao", { ascending: false }),
       supabase.from("api_logs").select("*").order("data_criacao", { ascending: false }).limit(100),
+      supabase.from("integracoes_externas").select("*").order("data_criacao", { ascending: false }),
+      supabase.from("integracoes_sync_logs").select("*").order("data_criacao", { ascending: false }).limit(50),
     ]);
     setKeys(k.data || []);
     setLogs(l.data || []);
+    setIntegracoes(i.data || []);
+    setSyncLogs(s.data || []);
   };
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
@@ -79,6 +133,47 @@ export default function ApiKeysPage() {
     toast.success("Copiado!");
   };
 
+  const saveIntegracao = async () => {
+    if (!integForm.nome.trim()) { toast.error("Informe o nome"); return; }
+    const { error } = await supabase.from("integracoes_externas").insert({
+      nome: integForm.nome,
+      tipo: integForm.tipo,
+      base_url: integForm.base_url,
+      auth_tipo: integForm.auth_tipo,
+      auth_config: integForm.auth_config,
+      endpoints: integForm.endpoints,
+      webhook_secret: integForm.webhook_secret || null,
+      ativo: true,
+    });
+    if (error) { toast.error("Erro ao salvar"); return; }
+    toast.success("Integração criada");
+    setOpenInteg(false);
+    setIntegForm({ nome: "", tipo: "totvs", ...ERP_TEMPLATES.totvs, webhook_secret: "" });
+    load();
+  };
+
+  const toggleIntegAtivo = async (i: any) => {
+    await supabase.from("integracoes_externas").update({ ativo: !i.ativo }).eq("id", i.id);
+    load();
+  };
+
+  const deleteInteg = async (id: string) => {
+    if (!confirm("Excluir integração?")) return;
+    await supabase.from("integracoes_externas").delete().eq("id", id);
+    load();
+  };
+
+  const testIntegracao = async (i: any, operacao: string) => {
+    setTesting(i.id + operacao);
+    setTestResult(null);
+    const { data, error } = await supabase.functions.invoke("external-proxy", {
+      body: { integracao_id: i.id, operacao },
+    });
+    setTesting(null);
+    setTestResult({ integ: i.nome, operacao, data, error: error?.message });
+    load();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -89,8 +184,10 @@ export default function ApiKeysPage() {
       <Tabs defaultValue="keys">
         <TabsList>
           <TabsTrigger value="keys">Chaves ({keys.length})</TabsTrigger>
+          <TabsTrigger value="integracoes">Integrações ({integracoes.length})</TabsTrigger>
           <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           <TabsTrigger value="docs">Documentação</TabsTrigger>
+          <TabsTrigger value="swagger">Swagger</TabsTrigger>
         </TabsList>
 
         <TabsContent value="keys" className="space-y-3 mt-4">
@@ -195,6 +292,100 @@ export default function ApiKeysPage() {
             </div>
           </Card>
         </TabsContent>
+
+        <TabsContent value="integracoes" className="space-y-3 mt-4">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <p className="text-sm text-muted-foreground">Conecte ERPs externos (TOTVS, SAP, Bling) ou qualquer API. Bidirecional: chame via proxy ou receba via webhook.</p>
+            <Button onClick={() => setOpenInteg(true)} className="gap-2"><Plus size={16} /> Nova Integração</Button>
+          </div>
+
+          {integracoes.length === 0 && <Card className="p-6 text-center text-muted-foreground">Nenhuma integração configurada.</Card>}
+          {integracoes.map(i => (
+            <Card key={i.id} className="p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{i.nome}</span>
+                    <Badge variant="outline" className="uppercase text-xs">{i.tipo}</Badge>
+                    {i.ativo ? <Badge className="bg-emerald-500/20 text-emerald-300">Ativa</Badge> : <Badge variant="secondary">Inativa</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{i.base_url}</div>
+                  <div className="text-xs text-muted-foreground">{i.total_chamadas} chamadas · Auth: {i.auth_tipo}</div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => toggleIntegAtivo(i)}>{i.ativo ? "Desativar" : "Ativar"}</Button>
+                  <Button size="sm" variant="destructive" onClick={() => deleteInteg(i.id)}><Trash2 size={14} /></Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold mb-1">Webhook URL (configure no ERP para enviar eventos):</p>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-secondary p-2 rounded text-xs break-all">{WEBHOOK_BASE}/{i.id}</code>
+                  <Button size="sm" variant="outline" onClick={() => copy(`${WEBHOOK_BASE}/${i.id}`)}><Copy size={14} /></Button>
+                </div>
+                {i.webhook_secret && <p className="text-xs text-muted-foreground mt-1">Header obrigatório: <code>x-webhook-secret: {i.webhook_secret}</code></p>}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold mb-1">Operações (clique para testar):</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(i.endpoints || {}).filter(k => k !== "webhook_map").map(op => (
+                    <Button key={op} size="sm" variant="outline" disabled={!i.ativo || testing === i.id + op}
+                      onClick={() => testIntegracao(i, op)}>
+                      {testing === i.id + op ? "Testando…" : `▶ ${op}`}
+                    </Button>
+                  ))}
+                  {Object.keys(i.endpoints || {}).filter(k => k !== "webhook_map").length === 0 && (
+                    <span className="text-xs text-muted-foreground">Nenhuma operação mapeada</span>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {testResult && (
+            <Card className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Resultado: {testResult.integ} → {testResult.operacao}</h4>
+                <Button size="sm" variant="ghost" onClick={() => setTestResult(null)}>Fechar</Button>
+              </div>
+              <pre className="text-xs bg-secondary p-3 rounded max-h-64 overflow-auto">{JSON.stringify(testResult.data || testResult.error, null, 2)}</pre>
+            </Card>
+          )}
+
+          {syncLogs.length > 0 && (
+            <Card className="p-4">
+              <h4 className="font-semibold mb-2">Últimas sincronizações</h4>
+              <div className="space-y-1">
+                {syncLogs.slice(0, 20).map(l => (
+                  <div key={l.id} className="flex items-center gap-2 text-xs">
+                    <Badge variant={l.sucesso ? "default" : "destructive"}>{l.status_code || "ERR"}</Badge>
+                    <span className="font-mono">{l.direcao}</span>
+                    <span className="flex-1 truncate">{l.integracao_nome} · {l.operacao}</span>
+                    <span className="text-muted-foreground">{l.duracao_ms}ms</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="swagger" className="mt-4 space-y-3">
+          <Card className="p-3 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-semibold">Spec OpenAPI 3.0</p>
+              <code className="text-xs text-muted-foreground break-all">{OPENAPI_URL}</code>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => copy(OPENAPI_URL)}><Copy size={14} className="mr-1" />URL</Button>
+              <a href={OPENAPI_URL} download="granado-openapi.json"><Button size="sm">Download spec</Button></a>
+            </div>
+          </Card>
+          <div className="bg-white rounded-lg overflow-hidden swagger-wrapper">
+            <SwaggerUI url={OPENAPI_URL} />
+          </div>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (!o) setCreatedKey(null); }}>
@@ -243,6 +434,70 @@ export default function ApiKeysPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openInteg} onOpenChange={setOpenInteg}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nova Integração Externa</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input value={integForm.nome} onChange={e => setIntegForm({ ...integForm, nome: e.target.value })} placeholder="Ex.: TOTVS Produção" />
+            </div>
+            <div>
+              <Label>Sistema (preenche template)</Label>
+              <select className="w-full bg-secondary p-2 rounded text-sm"
+                value={integForm.tipo}
+                onChange={e => setIntegForm({ ...integForm, tipo: e.target.value, ...ERP_TEMPLATES[e.target.value] })}>
+                <option value="totvs">TOTVS Protheus</option>
+                <option value="sap">SAP Business One</option>
+                <option value="bling">Bling ERP</option>
+                <option value="generico">Genérico</option>
+              </select>
+            </div>
+            <div>
+              <Label>URL base</Label>
+              <Input value={integForm.base_url} onChange={e => setIntegForm({ ...integForm, base_url: e.target.value })} />
+            </div>
+            <div>
+              <Label>Tipo de autenticação</Label>
+              <select className="w-full bg-secondary p-2 rounded text-sm"
+                value={integForm.auth_tipo}
+                onChange={e => setIntegForm({ ...integForm, auth_tipo: e.target.value })}>
+                <option value="oauth2">OAuth2 (client credentials/password)</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="basic">Basic Auth (usuário/senha)</option>
+                <option value="apikey_header">API Key em header</option>
+                <option value="cookie">Cookie (SAP B1 Service Layer)</option>
+              </select>
+            </div>
+            <div>
+              <Label>Configuração da auth (JSON)</Label>
+              <textarea className="w-full bg-secondary p-2 rounded text-xs font-mono min-h-[100px]"
+                value={JSON.stringify(integForm.auth_config, null, 2)}
+                onChange={e => {
+                  try { setIntegForm({ ...integForm, auth_config: JSON.parse(e.target.value) }); } catch { /* ignore */ }
+                }} />
+            </div>
+            <div>
+              <Label>Endpoints / mapeamentos (JSON)</Label>
+              <textarea className="w-full bg-secondary p-2 rounded text-xs font-mono min-h-[140px]"
+                value={JSON.stringify(integForm.endpoints, null, 2)}
+                onChange={e => {
+                  try { setIntegForm({ ...integForm, endpoints: JSON.parse(e.target.value) }); } catch { /* ignore */ }
+                }} />
+              <p className="text-xs text-muted-foreground mt-1">Formato: {`{ "operacao": { "metodo": "GET", "path": "/rota" } }`}. Use <code>webhook_map</code> para entrada.</p>
+            </div>
+            <div>
+              <Label>Webhook secret (opcional)</Label>
+              <Input value={integForm.webhook_secret} onChange={e => setIntegForm({ ...integForm, webhook_secret: e.target.value })} placeholder="Token que o ERP envia em x-webhook-secret" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpenInteg(false)}>Cancelar</Button>
+              <Button onClick={saveIntegracao}>Salvar</Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

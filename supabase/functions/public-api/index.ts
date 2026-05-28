@@ -51,6 +51,12 @@ Deno.serve(async (req) => {
   const resource = parts[vIdx + 1];
   const recordId = parts[vIdx + 2];
 
+  // OpenAPI spec — public, no auth
+  if (resource === "openapi.json") {
+    const publicBase = `${Deno.env.get("SUPABASE_URL")}/functions/v1/public-api/v1`;
+    return jsonResponse(buildOpenApiSpec(publicBase));
+  }
+
   // Authentication
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) return jsonResponse({ error: "Header x-api-key obrigatório" }, 401);
@@ -172,4 +178,75 @@ async function logCall(supabase: any, keyRow: any, req: Request, endpoint: strin
     ip: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip"),
     user_agent: req.headers.get("user-agent"),
   });
+}
+
+function buildOpenApiSpec(baseUrl: string) {
+  const resourceSchemas: Record<string, any> = {
+    recebimentos: { fornecedor: "string", numero_nf: "string", data_prevista: "date", horario_agenda: "time", toneladas: "number", status: "string" },
+    armazenagem: { recebimento_id: "uuid", status: "string", quantidade_volumes: "integer" },
+    solicitacoes_compras: { fornecedor: "string", volumes: "integer", data_sugerida: "date", status: "string" },
+    fornecedores_urgencia: { nome_fornecedor: "string", contagem_urgencias: "integer" },
+    fornecedores_nao_vieram: { fornecedor: "string", motivo: "string", multa: "number" },
+    portaria_registros: { veiculo_nome: "string", veiculo_placa: "string", motorista_nome: "string", km_chegada: "string" },
+    veiculos: { nome: "string", placa: "string", modelo: "string" },
+    motoristas: { nome: "string" },
+    ocorrencias_armazenagem: { fornecedor: "string", ocorrencia: "string" },
+    ocorrencias_tipos: { nome: "string" },
+    fluxo_financeiro: { tipo: "string", descricao: "string", valor: "number", mes_referencia: "date" },
+    valores_descarga: { valor_por_pallet: "number", valor_por_caixa: "number", valor_por_tonelada: "number", valor_multa: "number" },
+    relatorios_mensais: { fornecedor: "string", mes_referencia: "date", total_descargas: "integer", total_volumes: "integer" },
+    etiquetas_pallet: { descricao: "string", quantidade_caixa: "integer", validade: "date", peso: "string", usuario: "string" },
+  };
+
+  const paths: Record<string, any> = {};
+  for (const r of Object.keys(resourceSchemas)) {
+    const props: Record<string, any> = { id: { type: "string", format: "uuid" }, data_criacao: { type: "string", format: "date-time" } };
+    for (const [k, t] of Object.entries(resourceSchemas[r])) {
+      props[k] = t === "integer" ? { type: "integer" }
+              : t === "number" ? { type: "number" }
+              : t === "date" ? { type: "string", format: "date" }
+              : t === "time" ? { type: "string", format: "time" }
+              : t === "uuid" ? { type: "string", format: "uuid" }
+              : { type: "string" };
+    }
+    const schemaRef = { type: "object", properties: props };
+    paths[`/${r}`] = {
+      get: {
+        summary: `Listar ${r}`, tags: [r],
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 50, maximum: 200 } },
+          { name: "order", in: "query", description: "Ex: data_criacao.desc", schema: { type: "string" } },
+        ],
+        responses: { "200": { description: "OK", content: { "application/json": { schema: { type: "object", properties: { data: { type: "array", items: schemaRef }, meta: { type: "object" } } } } } } },
+      },
+      post: {
+        summary: `Criar ${r}`, tags: [r],
+        requestBody: { required: true, content: { "application/json": { schema: schemaRef } } },
+        responses: { "201": { description: "Criado" } },
+      },
+    };
+    paths[`/${r}/{id}`] = {
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+      get: { summary: `Obter ${r}`, tags: [r], responses: { "200": { description: "OK" }, "404": { description: "Não encontrado" } } },
+      patch: { summary: `Atualizar ${r}`, tags: [r], requestBody: { required: true, content: { "application/json": { schema: schemaRef } } }, responses: { "200": { description: "Atualizado" } } },
+      delete: { summary: `Excluir ${r}`, tags: [r], responses: { "200": { description: "Excluído" } } },
+    };
+  }
+
+  return {
+    openapi: "3.0.3",
+    info: {
+      title: "Granado API",
+      description: "API REST do sistema Granado Distribuidora. Autenticação via header `x-api-key`.",
+      version: "1.0.0",
+    },
+    servers: [{ url: baseUrl, description: "Produção" }],
+    components: {
+      securitySchemes: { ApiKeyAuth: { type: "apiKey", in: "header", name: "x-api-key" } },
+    },
+    security: [{ ApiKeyAuth: [] }],
+    tags: Object.keys(resourceSchemas).map(r => ({ name: r })),
+    paths,
+  };
 }
