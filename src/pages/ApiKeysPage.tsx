@@ -133,6 +133,47 @@ export default function ApiKeysPage() {
     toast.success("Copiado!");
   };
 
+  const saveIntegracao = async () => {
+    if (!integForm.nome.trim()) { toast.error("Informe o nome"); return; }
+    const { error } = await supabase.from("integracoes_externas").insert({
+      nome: integForm.nome,
+      tipo: integForm.tipo,
+      base_url: integForm.base_url,
+      auth_tipo: integForm.auth_tipo,
+      auth_config: integForm.auth_config,
+      endpoints: integForm.endpoints,
+      webhook_secret: integForm.webhook_secret || null,
+      ativo: true,
+    });
+    if (error) { toast.error("Erro ao salvar"); return; }
+    toast.success("Integração criada");
+    setOpenInteg(false);
+    setIntegForm({ nome: "", tipo: "totvs", ...ERP_TEMPLATES.totvs, webhook_secret: "" });
+    load();
+  };
+
+  const toggleIntegAtivo = async (i: any) => {
+    await supabase.from("integracoes_externas").update({ ativo: !i.ativo }).eq("id", i.id);
+    load();
+  };
+
+  const deleteInteg = async (id: string) => {
+    if (!confirm("Excluir integração?")) return;
+    await supabase.from("integracoes_externas").delete().eq("id", id);
+    load();
+  };
+
+  const testIntegracao = async (i: any, operacao: string) => {
+    setTesting(i.id + operacao);
+    setTestResult(null);
+    const { data, error } = await supabase.functions.invoke("external-proxy", {
+      body: { integracao_id: i.id, operacao },
+    });
+    setTesting(null);
+    setTestResult({ integ: i.nome, operacao, data, error: error?.message });
+    load();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
