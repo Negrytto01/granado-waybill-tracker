@@ -13,6 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Plus, Trash2, Ban, Check } from "lucide-react";
 import { toast } from "sonner";
+import SwaggerUI from "swagger-ui-react";
+import "swagger-ui-react/swagger-ui.css";
 
 const RESOURCES = [
   "recebimentos", "armazenagem", "solicitacoes_compras",
@@ -24,6 +26,48 @@ const RESOURCES = [
 ];
 
 const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/public-api/v1`;
+const OPENAPI_URL = `${API_BASE}/openapi.json`;
+const WEBHOOK_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/external-webhook`;
+
+const ERP_TEMPLATES: Record<string, { auth_tipo: string; auth_config: any; endpoints: any; base_url: string }> = {
+  totvs: {
+    base_url: "https://seu-totvs.com.br/rest",
+    auth_tipo: "oauth2",
+    auth_config: { token_url: "https://seu-totvs.com.br/api/oauth2/v1/token", client_id: "", client_secret: "", grant_type: "password", scope: "" },
+    endpoints: {
+      sincronizar_fornecedores: { metodo: "GET", path: "/fwmodel/SA2/items" },
+      enviar_recebimento: { metodo: "POST", path: "/fwmodel/SF1/items" },
+      sincronizar_produtos: { metodo: "GET", path: "/fwmodel/SB1/items" },
+      webhook_map: { fornecedor_atualizado: { tabela: "recebimentos", mapeamento: { fornecedor: "A2_NOME", cnpj: "A2_CGC" } } },
+    },
+  },
+  sap: {
+    base_url: "https://seu-sap:50000/b1s/v1",
+    auth_tipo: "cookie",
+    auth_config: { login_url: "https://seu-sap:50000/b1s/v1/Login", login_body: { CompanyDB: "SBODEMO", UserName: "manager", Password: "" } },
+    endpoints: {
+      sincronizar_fornecedores: { metodo: "GET", path: "/BusinessPartners?$filter=CardType eq 'cSupplier'" },
+      enviar_recebimento: { metodo: "POST", path: "/PurchaseDeliveryNotes" },
+      sincronizar_produtos: { metodo: "GET", path: "/Items" },
+    },
+  },
+  bling: {
+    base_url: "https://api.bling.com.br/Api/v3",
+    auth_tipo: "bearer",
+    auth_config: { token: "" },
+    endpoints: {
+      sincronizar_fornecedores: { metodo: "GET", path: "/contatos?tipo=F" },
+      enviar_recebimento: { metodo: "POST", path: "/notasfiscais" },
+      sincronizar_produtos: { metodo: "GET", path: "/produtos" },
+    },
+  },
+  generico: {
+    base_url: "https://api.exemplo.com",
+    auth_tipo: "bearer",
+    auth_config: { token: "" },
+    endpoints: {},
+  },
+};
 
 export default function ApiKeysPage() {
   const { isAdmin } = usePermissions();
@@ -34,14 +78,24 @@ export default function ApiKeysPage() {
   const [newRead, setNewRead] = useState<string[]>([]);
   const [newWrite, setNewWrite] = useState<string[]>([]);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [integracoes, setIntegracoes] = useState<any[]>([]);
+  const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [openInteg, setOpenInteg] = useState(false);
+  const [integForm, setIntegForm] = useState<any>({ nome: "", tipo: "totvs", ...ERP_TEMPLATES.totvs, webhook_secret: "" });
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testing, setTesting] = useState<string | null>(null);
 
   const load = async () => {
-    const [k, l] = await Promise.all([
+    const [k, l, i, s] = await Promise.all([
       supabase.from("api_keys").select("*").order("data_criacao", { ascending: false }),
       supabase.from("api_logs").select("*").order("data_criacao", { ascending: false }).limit(100),
+      supabase.from("integracoes_externas").select("*").order("data_criacao", { ascending: false }),
+      supabase.from("integracoes_sync_logs").select("*").order("data_criacao", { ascending: false }).limit(50),
     ]);
     setKeys(k.data || []);
     setLogs(l.data || []);
+    setIntegracoes(i.data || []);
+    setSyncLogs(s.data || []);
   };
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
