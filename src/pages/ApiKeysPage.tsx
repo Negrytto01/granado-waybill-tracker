@@ -436,6 +436,70 @@ export default function ApiKeysPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={openInteg} onOpenChange={setOpenInteg}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nova Integração Externa</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input value={integForm.nome} onChange={e => setIntegForm({ ...integForm, nome: e.target.value })} placeholder="Ex.: TOTVS Produção" />
+            </div>
+            <div>
+              <Label>Sistema (preenche template)</Label>
+              <select className="w-full bg-secondary p-2 rounded text-sm"
+                value={integForm.tipo}
+                onChange={e => setIntegForm({ ...integForm, tipo: e.target.value, ...ERP_TEMPLATES[e.target.value] })}>
+                <option value="totvs">TOTVS Protheus</option>
+                <option value="sap">SAP Business One</option>
+                <option value="bling">Bling ERP</option>
+                <option value="generico">Genérico</option>
+              </select>
+            </div>
+            <div>
+              <Label>URL base</Label>
+              <Input value={integForm.base_url} onChange={e => setIntegForm({ ...integForm, base_url: e.target.value })} />
+            </div>
+            <div>
+              <Label>Tipo de autenticação</Label>
+              <select className="w-full bg-secondary p-2 rounded text-sm"
+                value={integForm.auth_tipo}
+                onChange={e => setIntegForm({ ...integForm, auth_tipo: e.target.value })}>
+                <option value="oauth2">OAuth2 (client credentials/password)</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="basic">Basic Auth (usuário/senha)</option>
+                <option value="apikey_header">API Key em header</option>
+                <option value="cookie">Cookie (SAP B1 Service Layer)</option>
+              </select>
+            </div>
+            <div>
+              <Label>Configuração da auth (JSON)</Label>
+              <textarea className="w-full bg-secondary p-2 rounded text-xs font-mono min-h-[100px]"
+                value={JSON.stringify(integForm.auth_config, null, 2)}
+                onChange={e => {
+                  try { setIntegForm({ ...integForm, auth_config: JSON.parse(e.target.value) }); } catch { /* ignore */ }
+                }} />
+            </div>
+            <div>
+              <Label>Endpoints / mapeamentos (JSON)</Label>
+              <textarea className="w-full bg-secondary p-2 rounded text-xs font-mono min-h-[140px]"
+                value={JSON.stringify(integForm.endpoints, null, 2)}
+                onChange={e => {
+                  try { setIntegForm({ ...integForm, endpoints: JSON.parse(e.target.value) }); } catch { /* ignore */ }
+                }} />
+              <p className="text-xs text-muted-foreground mt-1">Formato: {`{ "operacao": { "metodo": "GET", "path": "/rota" } }`}. Use <code>webhook_map</code> para entrada.</p>
+            </div>
+            <div>
+              <Label>Webhook secret (opcional)</Label>
+              <Input value={integForm.webhook_secret} onChange={e => setIntegForm({ ...integForm, webhook_secret: e.target.value })} placeholder="Token que o ERP envia em x-webhook-secret" />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpenInteg(false)}>Cancelar</Button>
+              <Button onClick={saveIntegracao}>Salvar</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
