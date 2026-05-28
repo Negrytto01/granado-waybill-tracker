@@ -349,6 +349,105 @@ export type Database = {
         }
         Relationships: []
       }
+      integracoes_externas: {
+        Row: {
+          ativo: boolean
+          auth_config: Json
+          auth_tipo: string
+          base_url: string
+          criado_por: string | null
+          criado_por_user_id: string | null
+          data_criacao: string
+          endpoints: Json
+          headers_extras: Json
+          id: string
+          nome: string
+          tipo: string
+          total_chamadas: number
+          ultimo_uso: string | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          auth_config?: Json
+          auth_tipo: string
+          base_url: string
+          criado_por?: string | null
+          criado_por_user_id?: string | null
+          data_criacao?: string
+          endpoints?: Json
+          headers_extras?: Json
+          id?: string
+          nome: string
+          tipo: string
+          total_chamadas?: number
+          ultimo_uso?: string | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          auth_config?: Json
+          auth_tipo?: string
+          base_url?: string
+          criado_por?: string | null
+          criado_por_user_id?: string | null
+          data_criacao?: string
+          endpoints?: Json
+          headers_extras?: Json
+          id?: string
+          nome?: string
+          tipo?: string
+          total_chamadas?: number
+          ultimo_uso?: string | null
+          webhook_secret?: string | null
+        }
+        Relationships: []
+      }
+      integracoes_sync_logs: {
+        Row: {
+          data_criacao: string
+          direcao: string
+          duracao_ms: number | null
+          erro: string | null
+          id: string
+          integracao_id: string | null
+          integracao_nome: string | null
+          operacao: string
+          payload_req: Json | null
+          payload_resp: Json | null
+          status_code: number | null
+          sucesso: boolean
+        }
+        Insert: {
+          data_criacao?: string
+          direcao: string
+          duracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          integracao_id?: string | null
+          integracao_nome?: string | null
+          operacao: string
+          payload_req?: Json | null
+          payload_resp?: Json | null
+          status_code?: number | null
+          sucesso?: boolean
+        }
+        Update: {
+          data_criacao?: string
+          direcao?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          integracao_id?: string | null
+          integracao_nome?: string | null
+          operacao?: string
+          payload_req?: Json | null
+          payload_resp?: Json | null
+          status_code?: number | null
+          sucesso?: boolean
+        }
+        Relationships: []
+      }
       mensagens_globais: {
         Row: {
           data_criacao: string
