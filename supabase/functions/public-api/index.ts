@@ -53,7 +53,8 @@ Deno.serve(async (req) => {
 
   // OpenAPI spec — public, no auth
   if (resource === "openapi.json") {
-    return jsonResponse(buildOpenApiSpec(url.origin + url.pathname.replace(/\/openapi\.json.*$/, "")));
+    const publicBase = `${Deno.env.get("SUPABASE_URL")}/functions/v1/public-api/v1`;
+    return jsonResponse(buildOpenApiSpec(publicBase));
   }
 
   // Authentication
