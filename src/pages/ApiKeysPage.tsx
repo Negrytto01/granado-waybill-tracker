@@ -292,6 +292,100 @@ export default function ApiKeysPage() {
             </div>
           </Card>
         </TabsContent>
+
+        <TabsContent value="integracoes" className="space-y-3 mt-4">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <p className="text-sm text-muted-foreground">Conecte ERPs externos (TOTVS, SAP, Bling) ou qualquer API. Bidirecional: chame via proxy ou receba via webhook.</p>
+            <Button onClick={() => setOpenInteg(true)} className="gap-2"><Plus size={16} /> Nova Integração</Button>
+          </div>
+
+          {integracoes.length === 0 && <Card className="p-6 text-center text-muted-foreground">Nenhuma integração configurada.</Card>}
+          {integracoes.map(i => (
+            <Card key={i.id} className="p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{i.nome}</span>
+                    <Badge variant="outline" className="uppercase text-xs">{i.tipo}</Badge>
+                    {i.ativo ? <Badge className="bg-emerald-500/20 text-emerald-300">Ativa</Badge> : <Badge variant="secondary">Inativa</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{i.base_url}</div>
+                  <div className="text-xs text-muted-foreground">{i.total_chamadas} chamadas · Auth: {i.auth_tipo}</div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => toggleIntegAtivo(i)}>{i.ativo ? "Desativar" : "Ativar"}</Button>
+                  <Button size="sm" variant="destructive" onClick={() => deleteInteg(i.id)}><Trash2 size={14} /></Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold mb-1">Webhook URL (configure no ERP para enviar eventos):</p>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-secondary p-2 rounded text-xs break-all">{WEBHOOK_BASE}/{i.id}</code>
+                  <Button size="sm" variant="outline" onClick={() => copy(`${WEBHOOK_BASE}/${i.id}`)}><Copy size={14} /></Button>
+                </div>
+                {i.webhook_secret && <p className="text-xs text-muted-foreground mt-1">Header obrigatório: <code>x-webhook-secret: {i.webhook_secret}</code></p>}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold mb-1">Operações (clique para testar):</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(i.endpoints || {}).filter(k => k !== "webhook_map").map(op => (
+                    <Button key={op} size="sm" variant="outline" disabled={!i.ativo || testing === i.id + op}
+                      onClick={() => testIntegracao(i, op)}>
+                      {testing === i.id + op ? "Testando…" : `▶ ${op}`}
+                    </Button>
+                  ))}
+                  {Object.keys(i.endpoints || {}).filter(k => k !== "webhook_map").length === 0 && (
+                    <span className="text-xs text-muted-foreground">Nenhuma operação mapeada</span>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          {testResult && (
+            <Card className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Resultado: {testResult.integ} → {testResult.operacao}</h4>
+                <Button size="sm" variant="ghost" onClick={() => setTestResult(null)}>Fechar</Button>
+              </div>
+              <pre className="text-xs bg-secondary p-3 rounded max-h-64 overflow-auto">{JSON.stringify(testResult.data || testResult.error, null, 2)}</pre>
+            </Card>
+          )}
+
+          {syncLogs.length > 0 && (
+            <Card className="p-4">
+              <h4 className="font-semibold mb-2">Últimas sincronizações</h4>
+              <div className="space-y-1">
+                {syncLogs.slice(0, 20).map(l => (
+                  <div key={l.id} className="flex items-center gap-2 text-xs">
+                    <Badge variant={l.sucesso ? "default" : "destructive"}>{l.status_code || "ERR"}</Badge>
+                    <span className="font-mono">{l.direcao}</span>
+                    <span className="flex-1 truncate">{l.integracao_nome} · {l.operacao}</span>
+                    <span className="text-muted-foreground">{l.duracao_ms}ms</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="swagger" className="mt-4 space-y-3">
+          <Card className="p-3 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-semibold">Spec OpenAPI 3.0</p>
+              <code className="text-xs text-muted-foreground break-all">{OPENAPI_URL}</code>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => copy(OPENAPI_URL)}><Copy size={14} className="mr-1" />URL</Button>
+              <a href={OPENAPI_URL} download="granado-openapi.json"><Button size="sm">Download spec</Button></a>
+            </div>
+          </Card>
+          <div className="bg-white rounded-lg overflow-hidden swagger-wrapper">
+            <SwaggerUI url={OPENAPI_URL} />
+          </div>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={openNew} onOpenChange={(o) => { setOpenNew(o); if (!o) setCreatedKey(null); }}>
