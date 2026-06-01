@@ -7,17 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Users, KeyRound } from "lucide-react";
+import { UserPlus, Users, KeyRound, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 
 const cargos = ["Master", "Agendamento/Conferente", "Estoque", "Faturamento", "Compra", "Financeiro", "Fiscal", "Portaria"];
 
 const UsuariosPage = () => {
-  const { profile, signUp } = useAuth();
+  const { user, profile, signUp } = useAuth();
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [openNew, setOpenNew] = useState(false);
   const [resetModal, setResetModal] = useState<any>(null);
+  const [deleteModal, setDeleteModal] = useState<any>(null);
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
   const [form, setForm] = useState({ nome: "", senha: "", confirmarSenha: "", cargo: "Agendamento/Conferente" });
@@ -79,6 +80,25 @@ const UsuariosPage = () => {
     fetchData();
   };
 
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { user_id: deleteModal.user_id },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Usuário ${deleteModal.nome} excluído!`);
+      setDeleteModal(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao excluir usuário");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (profile?.cargo !== "Master") {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -129,6 +149,11 @@ const UsuariosPage = () => {
               <Button variant="ghost" size="icon" onClick={() => { setResetModal(u); setNovaSenha(""); setConfirmarNovaSenha(""); }} title="Redefinir senha" className="text-muted-foreground hover:text-foreground">
                 <KeyRound className="h-4 w-4" />
               </Button>
+              {u.user_id !== user?.id && (
+                <Button variant="ghost" size="icon" onClick={() => setDeleteModal(u)} title="Excluir usuário" className="text-muted-foreground hover:text-red-400">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
               <span className="text-xs text-muted-foreground">{(u.ativo ?? true) ? "Ativo" : "Inativo"}</span>
               <Switch checked={u.ativo ?? true} onCheckedChange={() => toggleAtivo(u)} />
             </div>
@@ -150,6 +175,24 @@ const UsuariosPage = () => {
             <Button onClick={handleResetPassword} disabled={loading} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
               {loading ? "Redefinindo..." : "Redefinir Senha"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation modal */}
+      <Dialog open={!!deleteModal} onOpenChange={(open) => { if (!open) setDeleteModal(null); }}>
+        <DialogContent className="bg-card border-red-500/30">
+          <DialogHeader><DialogTitle className="font-heading text-red-400">Excluir Usuário</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir <strong className="text-foreground">{deleteModal?.nome}</strong>? Esta ação é permanente.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDeleteModal(null)} className="flex-1">Cancelar</Button>
+              <Button onClick={handleDelete} disabled={loading} className="flex-1 bg-red-600 text-white hover:bg-red-700">
+                {loading ? "Excluindo..." : "Excluir"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
