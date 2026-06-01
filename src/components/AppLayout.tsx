@@ -58,16 +58,21 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       const dayOfMonth = today.getDate();
       if (dayOfWeek !== 1 || dayOfMonth < 15) return;
       if (!hasAccess("agenda") && !hasAccess("compras") && !isAdmin) return;
+      if (!profile?.data_criacao) return;
       const dismissedKey = `urgent_alert_${today.toISOString().split("T")[0]}`;
       if (localStorage.getItem(dismissedKey)) return;
-      const { data } = await supabase.from("fornecedores_urgencia").select("nome_fornecedor").order("contagem_urgencias", { ascending: false });
+      const { data } = await supabase
+        .from("fornecedores_urgencia")
+        .select("nome_fornecedor")
+        .gte("ultima_urgencia", profile.data_criacao)
+        .order("contagem_urgencias", { ascending: false });
       if (data && data.length > 0) {
         setUrgentFornecedores(data.map((f: any) => f.nome_fornecedor));
         setUrgentAlert(true);
       }
     };
     checkAlert();
-  }, [hasAccess, isAdmin]);
+  }, [hasAccess, isAdmin, profile?.data_criacao]);
 
   const dismissAlert = () => {
     const dismissedKey = `urgent_alert_${new Date().toISOString().split("T")[0]}`;
