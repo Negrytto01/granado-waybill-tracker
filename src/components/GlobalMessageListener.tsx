@@ -11,9 +11,11 @@ const GlobalMessageListener = () => {
 
   const checkMessages = useCallback(async () => {
     if (!user || !profile) return;
+    const since = profile.data_criacao;
     const { data } = await supabase
       .from("mensagens_globais")
       .select("*")
+      .gte("data_criacao", since)
       .order("data_criacao", { ascending: false })
       .limit(20);
 
