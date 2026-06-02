@@ -36,6 +36,7 @@ const AgendaPage = () => {
   const [entradaCompletaModal, setEntradaCompletaModal] = useState<any>(null);
   const [entradaValor, setEntradaValor] = useState("");
   const [entradaObs, setEntradaObs] = useState("");
+  const [entradaTransportadora, setEntradaTransportadora] = useState("");
   const [valoresConfig, setValoresConfig] = useState({ valor_multa: 0 });
   const isAdmin = profile?.cargo === "Master";
 
@@ -124,6 +125,7 @@ const AgendaPage = () => {
       valor_cobrado: valor,
       observacoes: entradaObs ? `[Entrada Admin] ${entradaObs}` : r.observacoes,
       usuario_responsavel: profile?.nome,
+      transportadora: entradaTransportadora || r.transportadora || null,
     }).eq("id", r.id);
     if (error) { toast.error(error.message); return; }
     await supabase.from("armazenagem").insert([{
@@ -141,6 +143,7 @@ const AgendaPage = () => {
     setEntradaCompletaModal(null);
     setEntradaValor("");
     setEntradaObs("");
+    setEntradaTransportadora("");
   };
 
   const handleEdit = async () => {
@@ -422,7 +425,7 @@ const AgendaPage = () => {
       </Dialog>
 
       {/* Entrada Completa (Admin) */}
-      <Dialog open={!!entradaCompletaModal} onOpenChange={(open) => { if (!open) { setEntradaCompletaModal(null); setEntradaValor(""); setEntradaObs(""); } }}>
+      <Dialog open={!!entradaCompletaModal} onOpenChange={(open) => { if (!open) { setEntradaCompletaModal(null); setEntradaValor(""); setEntradaObs(""); setEntradaTransportadora(""); } }}>
         <DialogContent className="bg-card border-border">
           <DialogHeader><DialogTitle className="font-heading neon-text">Entrada Completa — Admin</DialogTitle></DialogHeader>
           <div className="space-y-3">
@@ -435,6 +438,10 @@ const AgendaPage = () => {
             <div>
               <label className="text-xs text-muted-foreground">Valor da Descarga (R$)</label>
               <Input type="text" inputMode="decimal" placeholder="0,00" value={entradaValor} onChange={e => setEntradaValor(e.target.value.replace(",", "."))} className="bg-secondary mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Transportadora</label>
+              <Input type="text" placeholder="Nome da transportadora" value={entradaTransportadora} onChange={e => setEntradaTransportadora(e.target.value)} className="bg-secondary mt-1" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Observação (opcional)</label>

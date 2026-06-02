@@ -33,6 +33,7 @@ const DescargaPage = () => {
   const [tipoDescarga, setTipoDescarga] = useState("nenhum");
   const [observacoes, setObservacoes] = useState("");
   const [nfdNumero, setNfdNumero] = useState("");
+  const [transportadora, setTransportadora] = useState("");
   const [jaArmazenado, setJaArmazenado] = useState(false);
   const [valoresConfig, setValoresConfig] = useState({ valor_por_caixa: 0, valor_por_pallet: 0, valor_por_tonelada: 0 });
   const isAdmin = profile?.cargo === "Master";
@@ -134,6 +135,7 @@ const DescargaPage = () => {
     setObservacoes(r.observacoes || "");
     setNfdNumero(r.nfd_numero || "");
     setJaArmazenado(false);
+    setTransportadora(r.transportadora || "");
   };
 
   const calcValorTotal = () => {
@@ -164,6 +166,7 @@ const DescargaPage = () => {
       valor_cobrado: valorTotal,
       observacoes: observacoes || null,
       nfd_numero: nfdNumero || null,
+      transportadora: transportadora || null,
     }).eq("id", finalizarModal.id);
 
     if (!finalizarModal.is_pallet && !jaArmazenado) {
@@ -360,6 +363,10 @@ const DescargaPage = () => {
             <div>
               <label className="text-sm text-muted-foreground">NFD (Nota Fiscal de Devolução)</label>
               <Input value={nfdNumero} onChange={e => setNfdNumero(e.target.value)} className="bg-secondary mt-1" placeholder="Número da NFD (se houver)" inputMode="numeric" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Transportadora</label>
+              <Input value={transportadora} onChange={e => setTransportadora(e.target.value)} className="bg-secondary mt-1" placeholder="Nome da transportadora" />
             </div>
 
             {/* Já armazenado? */}
