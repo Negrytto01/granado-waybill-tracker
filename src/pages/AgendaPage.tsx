@@ -328,29 +328,27 @@ const AgendaPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
-                    <Button type="button" variant="outline" size="sm" onClick={addNfEntry} className="text-xs border-primary/50 text-primary">
-                      <Plus className="h-3 w-3 mr-1" /> Adicionar NF
-                    </Button>
+                  <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
+                  <Textarea
+                    placeholder="Cole/digite todas as NFs separadas por vírgula, espaço ou nova linha. Ex: 12345, 12346 12347"
+                    value={nfsTexto}
+                    onChange={e => setNfsTexto(e.target.value)}
+                    className="bg-secondary"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {nfsTexto.split(/[\s,;\n]+/).filter(Boolean).length} NF(s) detectada(s)
+                  </p>
+                  <div className="flex items-center gap-2 py-1">
+                    <Checkbox id="pallet-all" checked={isPalletAll} onCheckedChange={(c) => setIsPalletAll(!!c)} />
+                    <label htmlFor="pallet-all" className="text-xs text-muted-foreground cursor-pointer">Todas as NFs são de Pallet</label>
                   </div>
-                  {nfEntries.map((nf, i) => (
-                    <div key={i} className="flex gap-2 items-start">
-                      <div className="flex-1 space-y-1">
-                        <Input placeholder={`Número NF ${i + 1}`} inputMode="numeric" value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
-                        <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
-                        <div className="flex items-center gap-2 py-1">
-                          <Checkbox id={`pallet-${i}`} checked={nf.is_pallet} onCheckedChange={(checked) => updateNfEntry(i, "is_pallet", !!checked)} />
-                          <label htmlFor={`pallet-${i}`} className="text-xs text-muted-foreground cursor-pointer">NF de Pallet</label>
-                        </div>
-                      </div>
-                      {nfEntries.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
+                  {!isPalletAll && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Volume Total (caixas — soma de todas as NFs)</label>
+                      <Input type="text" inputMode="numeric" placeholder="Ex: 250" value={volumesTotal} onChange={e => setVolumesTotal(e.target.value)} className="bg-secondary mt-1" />
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
