@@ -421,6 +421,32 @@ const AgendaPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Entrada Completa (Admin) */}
+      <Dialog open={!!entradaCompletaModal} onOpenChange={(open) => { if (!open) { setEntradaCompletaModal(null); setEntradaValor(""); setEntradaObs(""); } }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Entrada Completa — Admin</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Fornecedor: <strong className="text-foreground">{entradaCompletaModal?.fornecedor}</strong>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Esta ação executa todas as etapas (chegada, descarga e armazenagem) e finaliza o recebimento.
+            </p>
+            <div>
+              <label className="text-xs text-muted-foreground">Valor da Descarga (R$)</label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={entradaValor} onChange={e => setEntradaValor(e.target.value.replace(",", "."))} className="bg-secondary mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Observação (opcional)</label>
+              <Textarea placeholder="Observações sobre a entrada..." value={entradaObs} onChange={e => setEntradaObs(e.target.value)} className="bg-secondary mt-1" rows={3} />
+            </div>
+            <Button onClick={handleEntradaCompleta} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Finalizar Entrada
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {groups.map(group => group.items.length > 0 && (
         <div key={group.label} className="space-y-3">
           <h2 className="font-heading text-lg text-foreground border-b border-border pb-1">{group.label}</h2>
@@ -464,6 +490,11 @@ const AgendaPage = () => {
                   )}
                   {isAdmin && (
                     <>
+                      {!["FINALIZADO", "NAO_VEIO"].includes(r.status) && (
+                        <Button size="sm" onClick={() => setEntradaCompletaModal(r)} className="bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 text-xs">
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> Entrada Completa
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => openEdit(r)} className="text-muted-foreground hover:text-foreground h-7 w-7 p-0">
                         <Edit className="h-3 w-3" />
                       </Button>
