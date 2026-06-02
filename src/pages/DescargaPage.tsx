@@ -33,6 +33,7 @@ const DescargaPage = () => {
   const [tipoDescarga, setTipoDescarga] = useState("nenhum");
   const [observacoes, setObservacoes] = useState("");
   const [nfdNumero, setNfdNumero] = useState("");
+  const [transportadora, setTransportadora] = useState("");
   const [jaArmazenado, setJaArmazenado] = useState(false);
   const [valoresConfig, setValoresConfig] = useState({ valor_por_caixa: 0, valor_por_pallet: 0, valor_por_tonelada: 0 });
   const isAdmin = profile?.cargo === "Master";
