@@ -364,6 +364,10 @@ const DescargaPage = () => {
               <label className="text-sm text-muted-foreground">NFD (Nota Fiscal de Devolução)</label>
               <Input value={nfdNumero} onChange={e => setNfdNumero(e.target.value)} className="bg-secondary mt-1" placeholder="Número da NFD (se houver)" inputMode="numeric" />
             </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Transportadora</label>
+              <Input value={transportadora} onChange={e => setTransportadora(e.target.value)} className="bg-secondary mt-1" placeholder="Nome da transportadora" />
+            </div>
 
             {/* Já armazenado? */}
             <div className="flex items-center gap-2 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
