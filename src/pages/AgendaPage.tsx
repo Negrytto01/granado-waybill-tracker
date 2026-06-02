@@ -10,13 +10,7 @@ import { toast } from "sonner";
 import { getStatusClass, formatDate, formatTime, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap } from "lucide-react";
-
-interface NFEntry {
-  numero_nf: string;
-  quantidade_volumes: number;
-  is_pallet: boolean;
-}
+import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap, CheckCircle2 } from "lucide-react";
 
 const AgendaPage = () => {
   const { profile } = useAuth();
@@ -33,10 +27,15 @@ const AgendaPage = () => {
   const [isRetirada, setIsRetirada] = useState(false);
   const [isMarketing, setIsMarketing] = useState(false);
   const [isEncaixe, setIsEncaixe] = useState(false);
-  const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
+  const [nfsTexto, setNfsTexto] = useState("");
+  const [volumesTotal, setVolumesTotal] = useState("");
+  const [isPalletAll, setIsPalletAll] = useState(false);
   const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "", is_pallet: false });
   const [naoVeioModal, setNaoVeioModal] = useState<any>(null);
   const [naoVeioObs, setNaoVeioObs] = useState("");
+  const [entradaCompletaModal, setEntradaCompletaModal] = useState<any>(null);
+  const [entradaValor, setEntradaValor] = useState("");
+  const [entradaObs, setEntradaObs] = useState("");
   const [valoresConfig, setValoresConfig] = useState({ valor_multa: 0 });
   const isAdmin = profile?.cargo === "Master";
 
@@ -65,15 +64,9 @@ const AgendaPage = () => {
     setIsRetirada(false);
     setIsMarketing(false);
     setIsEncaixe(false);
-    setNfEntries([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
-  };
-
-  const addNfEntry = () => setNfEntries([...nfEntries, { numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
-  const removeNfEntry = (i: number) => setNfEntries(nfEntries.filter((_, idx) => idx !== i));
-  const updateNfEntry = (i: number, field: keyof NFEntry, value: string | number | boolean) => {
-    const updated = [...nfEntries];
-    (updated[i] as any)[field] = value;
-    setNfEntries(updated);
+    setNfsTexto("");
+    setVolumesTotal("");
+    setIsPalletAll(false);
   };
 
   const logActivity = async (acao: string, detalhes?: string) => {
@@ -89,13 +82,12 @@ const AgendaPage = () => {
   };
 
   const handleCreate = async () => {
-    const validNFs = nfEntries.filter(nf => nf.numero_nf.trim());
-    if (validNFs.length === 0) {
-      validNFs.push({ numero_nf: "S/N", quantidade_volumes: 0, is_pallet: false });
-    }
-    const concatenatedNFs = validNFs.map(nf => nf.numero_nf).join(" / ");
-    const totalVolumes = validNFs.filter(nf => !nf.is_pallet).reduce((sum, nf) => sum + Number(nf.quantidade_volumes), 0);
-    const hasPallet = validNFs.some(nf => nf.is_pallet);
+    // Aceita NFs separadas por vírgula, espaço, ponto-e-vírgula ou nova linha
+    const nfs = nfsTexto.split(/[\s,;\n]+/).map(s => s.trim()).filter(Boolean);
+    if (nfs.length === 0) nfs.push("S/N");
+    const concatenatedNFs = nfs.join(" / ");
+    const totalVolumes = isPalletAll ? 0 : Number(volumesTotal || 0);
+    const hasPallet = isPalletAll;
 
     const { error } = await supabase.from("recebimentos").insert([{
       numero_nf: concatenatedNFs,
@@ -115,6 +107,40 @@ const AgendaPage = () => {
     toast.success("Agendamento salvo!");
     setOpenNew(false);
     resetForm();
+  };
+
+  const handleEntradaCompleta = async () => {
+    if (!entradaCompletaModal) return;
+    const r = entradaCompletaModal;
+    const now = new Date().toISOString();
+    const valor = Number(entradaValor || 0);
+    const { error } = await supabase.from("recebimentos").update({
+      status: "FINALIZADO" as any,
+      hora_chegada: r.hora_chegada || now,
+      hora_acoplagem: r.hora_acoplagem || now,
+      hora_inicio_descarga: r.hora_inicio_descarga || now,
+      hora_fim_descarga: r.hora_fim_descarga || now,
+      hora_desacoplagem: r.hora_desacoplagem || now,
+      valor_cobrado: valor,
+      observacoes: entradaObs ? `[Entrada Admin] ${entradaObs}` : r.observacoes,
+      usuario_responsavel: profile?.nome,
+    }).eq("id", r.id);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from("armazenagem").insert([{
+      recebimento_id: r.id,
+      quantidade_itens: r.quantidade_itens || 0,
+      quantidade_volumes: r.quantidade_volumes || 0,
+      status: "FINALIZADO" as any,
+      usuario_responsavel: profile?.nome,
+      hora_inicio: now,
+      hora_fim: now,
+      observacoes_armazenagem: entradaObs || null,
+    }] as any);
+    await logActivity("Entrada completa (Admin)", `${r.fornecedor} - NF ${r.numero_nf} - R$ ${valor.toFixed(2)}`);
+    toast.success("Entrada finalizada com sucesso!");
+    setEntradaCompletaModal(null);
+    setEntradaValor("");
+    setEntradaObs("");
   };
 
   const handleEdit = async () => {
@@ -302,29 +328,27 @@ const AgendaPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
-                    <Button type="button" variant="outline" size="sm" onClick={addNfEntry} className="text-xs border-primary/50 text-primary">
-                      <Plus className="h-3 w-3 mr-1" /> Adicionar NF
-                    </Button>
+                  <label className="text-sm font-medium text-foreground">Notas Fiscais</label>
+                  <Textarea
+                    placeholder="Cole/digite todas as NFs separadas por vírgula, espaço ou nova linha. Ex: 12345, 12346 12347"
+                    value={nfsTexto}
+                    onChange={e => setNfsTexto(e.target.value)}
+                    className="bg-secondary"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {nfsTexto.split(/[\s,;\n]+/).filter(Boolean).length} NF(s) detectada(s)
+                  </p>
+                  <div className="flex items-center gap-2 py-1">
+                    <Checkbox id="pallet-all" checked={isPalletAll} onCheckedChange={(c) => setIsPalletAll(!!c)} />
+                    <label htmlFor="pallet-all" className="text-xs text-muted-foreground cursor-pointer">Todas as NFs são de Pallet</label>
                   </div>
-                  {nfEntries.map((nf, i) => (
-                    <div key={i} className="flex gap-2 items-start">
-                      <div className="flex-1 space-y-1">
-                        <Input placeholder={`Número NF ${i + 1}`} inputMode="numeric" value={nf.numero_nf} onChange={e => updateNfEntry(i, "numero_nf", e.target.value)} className="bg-secondary" />
-                        <Input type="text" inputMode="numeric" placeholder="Qtd Volumes (Caixas)" value={nf.quantidade_volumes || ""} onChange={e => updateNfEntry(i, "quantidade_volumes", Number(e.target.value))} className="bg-secondary" />
-                        <div className="flex items-center gap-2 py-1">
-                          <Checkbox id={`pallet-${i}`} checked={nf.is_pallet} onCheckedChange={(checked) => updateNfEntry(i, "is_pallet", !!checked)} />
-                          <label htmlFor={`pallet-${i}`} className="text-xs text-muted-foreground cursor-pointer">NF de Pallet</label>
-                        </div>
-                      </div>
-                      {nfEntries.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeNfEntry(i)} className="text-destructive mt-1">
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
+                  {!isPalletAll && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Volume Total (caixas — soma de todas as NFs)</label>
+                      <Input type="text" inputMode="numeric" placeholder="Ex: 250" value={volumesTotal} onChange={e => setVolumesTotal(e.target.value)} className="bg-secondary mt-1" />
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
@@ -397,6 +421,32 @@ const AgendaPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Entrada Completa (Admin) */}
+      <Dialog open={!!entradaCompletaModal} onOpenChange={(open) => { if (!open) { setEntradaCompletaModal(null); setEntradaValor(""); setEntradaObs(""); } }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle className="font-heading neon-text">Entrada Completa — Admin</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Fornecedor: <strong className="text-foreground">{entradaCompletaModal?.fornecedor}</strong>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Esta ação executa todas as etapas (chegada, descarga e armazenagem) e finaliza o recebimento.
+            </p>
+            <div>
+              <label className="text-xs text-muted-foreground">Valor da Descarga (R$)</label>
+              <Input type="text" inputMode="decimal" placeholder="0,00" value={entradaValor} onChange={e => setEntradaValor(e.target.value.replace(",", "."))} className="bg-secondary mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Observação (opcional)</label>
+              <Textarea placeholder="Observações sobre a entrada..." value={entradaObs} onChange={e => setEntradaObs(e.target.value)} className="bg-secondary mt-1" rows={3} />
+            </div>
+            <Button onClick={handleEntradaCompleta} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Finalizar Entrada
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {groups.map(group => group.items.length > 0 && (
         <div key={group.label} className="space-y-3">
           <h2 className="font-heading text-lg text-foreground border-b border-border pb-1">{group.label}</h2>
@@ -440,6 +490,11 @@ const AgendaPage = () => {
                   )}
                   {isAdmin && (
                     <>
+                      {!["FINALIZADO", "NAO_VEIO"].includes(r.status) && (
+                        <Button size="sm" onClick={() => setEntradaCompletaModal(r)} className="bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 text-xs">
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> Entrada Completa
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => openEdit(r)} className="text-muted-foreground hover:text-foreground h-7 w-7 p-0">
                         <Edit className="h-3 w-3" />
                       </Button>
