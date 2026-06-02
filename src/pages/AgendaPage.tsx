@@ -138,6 +138,15 @@ const AgendaPage = () => {
       hora_fim: now,
       observacoes_armazenagem: entradaObs || null,
     }] as any);
+    if (valor > 0) {
+      await supabase.from("fluxo_financeiro").insert([{
+        tipo: "ENTRADA",
+        descricao: `Descarga NF ${r.numero_nf} - ${r.fornecedor}`,
+        valor: valor,
+        recebimento_id: r.id,
+        criado_por: profile?.nome,
+      }] as any);
+    }
     await logActivity("Entrada completa (Admin)", `${r.fornecedor} - NF ${r.numero_nf} - R$ ${valor.toFixed(2)}`);
     toast.success("Entrada finalizada com sucesso!");
     setEntradaCompletaModal(null);
