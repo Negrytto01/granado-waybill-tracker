@@ -135,6 +135,7 @@ const DescargaPage = () => {
     setObservacoes(r.observacoes || "");
     setNfdNumero(r.nfd_numero || "");
     setJaArmazenado(false);
+    setTransportadora(r.transportadora || "");
   };
 
   const calcValorTotal = () => {
@@ -165,6 +166,7 @@ const DescargaPage = () => {
       valor_cobrado: valorTotal,
       observacoes: observacoes || null,
       nfd_numero: nfdNumero || null,
+      transportadora: transportadora || null,
     }).eq("id", finalizarModal.id);
 
     if (!finalizarModal.is_pallet && !jaArmazenado) {
