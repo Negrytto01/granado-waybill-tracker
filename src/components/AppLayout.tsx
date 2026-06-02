@@ -31,7 +31,7 @@ const allNavItems = [
   { label: "Relatórios", icon: BarChart3, path: "/relatorios", page: "relatorios" },
   { label: "Não Vieram", icon: Ban, path: "/naovieram", page: "naovieram" },
   { label: "Cad. Veículos", icon: Car, path: "/portaria", page: "portaria" },
-  { label: "Hist. Portaria", icon: DoorOpen, path: "/portaria-historico", page: "portaria_historico" },
+  { label: "Portaria", icon: DoorOpen, path: "/portaria-historico", page: "portaria_historico" },
   { label: "Valores", icon: DollarSign, path: "/valores", page: "valores" },
   { label: "Usuários", icon: Users, path: "/usuarios", page: "usuarios" },
   { label: "Permissões", icon: Shield, path: "/permissoes", page: "permissoes" },
