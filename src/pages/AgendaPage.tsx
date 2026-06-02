@@ -10,13 +10,7 @@ import { toast } from "sonner";
 import { getStatusClass, formatDate, formatTime, formatNF } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap } from "lucide-react";
-
-interface NFEntry {
-  numero_nf: string;
-  quantidade_volumes: number;
-  is_pallet: boolean;
-}
+import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap, CheckCircle2 } from "lucide-react";
 
 const AgendaPage = () => {
   const { profile } = useAuth();
@@ -33,10 +27,15 @@ const AgendaPage = () => {
   const [isRetirada, setIsRetirada] = useState(false);
   const [isMarketing, setIsMarketing] = useState(false);
   const [isEncaixe, setIsEncaixe] = useState(false);
-  const [nfEntries, setNfEntries] = useState<NFEntry[]>([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
+  const [nfsTexto, setNfsTexto] = useState("");
+  const [volumesTotal, setVolumesTotal] = useState("");
+  const [isPalletAll, setIsPalletAll] = useState(false);
   const [editForm, setEditForm] = useState({ numero_nf: "", fornecedor: "", quantidade_volumes: 0, data_prevista: "", horario_agenda: "", is_pallet: false });
   const [naoVeioModal, setNaoVeioModal] = useState<any>(null);
   const [naoVeioObs, setNaoVeioObs] = useState("");
+  const [entradaCompletaModal, setEntradaCompletaModal] = useState<any>(null);
+  const [entradaValor, setEntradaValor] = useState("");
+  const [entradaObs, setEntradaObs] = useState("");
   const [valoresConfig, setValoresConfig] = useState({ valor_multa: 0 });
   const isAdmin = profile?.cargo === "Master";
 
@@ -65,15 +64,9 @@ const AgendaPage = () => {
     setIsRetirada(false);
     setIsMarketing(false);
     setIsEncaixe(false);
-    setNfEntries([{ numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
-  };
-
-  const addNfEntry = () => setNfEntries([...nfEntries, { numero_nf: "", quantidade_volumes: 0, is_pallet: false }]);
-  const removeNfEntry = (i: number) => setNfEntries(nfEntries.filter((_, idx) => idx !== i));
-  const updateNfEntry = (i: number, field: keyof NFEntry, value: string | number | boolean) => {
-    const updated = [...nfEntries];
-    (updated[i] as any)[field] = value;
-    setNfEntries(updated);
+    setNfsTexto("");
+    setVolumesTotal("");
+    setIsPalletAll(false);
   };
 
   const logActivity = async (acao: string, detalhes?: string) => {
@@ -89,13 +82,12 @@ const AgendaPage = () => {
   };
 
   const handleCreate = async () => {
-    const validNFs = nfEntries.filter(nf => nf.numero_nf.trim());
-    if (validNFs.length === 0) {
-      validNFs.push({ numero_nf: "S/N", quantidade_volumes: 0, is_pallet: false });
-    }
-    const concatenatedNFs = validNFs.map(nf => nf.numero_nf).join(" / ");
-    const totalVolumes = validNFs.filter(nf => !nf.is_pallet).reduce((sum, nf) => sum + Number(nf.quantidade_volumes), 0);
-    const hasPallet = validNFs.some(nf => nf.is_pallet);
+    // Aceita NFs separadas por vírgula, espaço, ponto-e-vírgula ou nova linha
+    const nfs = nfsTexto.split(/[\s,;\n]+/).map(s => s.trim()).filter(Boolean);
+    if (nfs.length === 0) nfs.push("S/N");
+    const concatenatedNFs = nfs.join(" / ");
+    const totalVolumes = isPalletAll ? 0 : Number(volumesTotal || 0);
+    const hasPallet = isPalletAll;
 
     const { error } = await supabase.from("recebimentos").insert([{
       numero_nf: concatenatedNFs,
@@ -115,6 +107,40 @@ const AgendaPage = () => {
     toast.success("Agendamento salvo!");
     setOpenNew(false);
     resetForm();
+  };
+
+  const handleEntradaCompleta = async () => {
+    if (!entradaCompletaModal) return;
+    const r = entradaCompletaModal;
+    const now = new Date().toISOString();
+    const valor = Number(entradaValor || 0);
+    const { error } = await supabase.from("recebimentos").update({
+      status: "FINALIZADO" as any,
+      hora_chegada: r.hora_chegada || now,
+      hora_acoplagem: r.hora_acoplagem || now,
+      hora_inicio_descarga: r.hora_inicio_descarga || now,
+      hora_fim_descarga: r.hora_fim_descarga || now,
+      hora_desacoplagem: r.hora_desacoplagem || now,
+      valor_cobrado: valor,
+      observacoes: entradaObs ? `[Entrada Admin] ${entradaObs}` : r.observacoes,
+      usuario_responsavel: profile?.nome,
+    }).eq("id", r.id);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from("armazenagem").insert([{
+      recebimento_id: r.id,
+      quantidade_itens: r.quantidade_itens || 0,
+      quantidade_volumes: r.quantidade_volumes || 0,
+      status: "FINALIZADO" as any,
+      usuario_responsavel: profile?.nome,
+      hora_inicio: now,
+      hora_fim: now,
+      observacoes_armazenagem: entradaObs || null,
+    }] as any);
+    await logActivity("Entrada completa (Admin)", `${r.fornecedor} - NF ${r.numero_nf} - R$ ${valor.toFixed(2)}`);
+    toast.success("Entrada finalizada com sucesso!");
+    setEntradaCompletaModal(null);
+    setEntradaValor("");
+    setEntradaObs("");
   };
 
   const handleEdit = async () => {
