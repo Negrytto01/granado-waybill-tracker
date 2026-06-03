@@ -232,6 +232,27 @@ const HistoricoPage = () => {
 
                     {isExpanded && (
                       <div className="px-3 pb-3 border-t border-border/50 space-y-3">
+                        <div className="mt-3 p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-1">
+                          <div className="flex justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">Fornecedor</span>
+                            <span className="text-sm font-heading text-foreground text-right">{r.fornecedor || "-"}</span>
+                          </div>
+                          <div className="flex justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">Transportadora</span>
+                            <span className="text-sm text-foreground text-right">{r.transportadora || "-"}</span>
+                          </div>
+                          <div className="flex justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">Valor cobrado</span>
+                            <span className="text-sm font-heading text-primary text-right">R$ {Number(r.valor_cobrado || 0).toFixed(2)}</span>
+                          </div>
+                          {r.usuario_responsavel && (
+                            <div className="flex justify-between gap-2">
+                              <span className="text-xs text-muted-foreground">Finalizado por</span>
+                              <span className="text-xs text-foreground text-right">{r.usuario_responsavel}</span>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="grid grid-cols-2 gap-2 text-sm mt-3">
                           <div><span className="text-muted-foreground">Volumes:</span> <span className="text-foreground">{r.quantidade_volumes || 0}</span></div>
                           <div><span className="text-muted-foreground">Resp:</span> <span className="text-foreground">{r.usuario_responsavel || "-"}</span></div>

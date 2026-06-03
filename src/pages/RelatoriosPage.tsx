@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+const normalizeFornecedor = (name: string | null | undefined): string => {
+  if (!name) return "N/A";
+  return name.trim().replace(/\s+/g, " ");
+};
+
 interface FornecedorStats {
   fornecedor: string;
   volumes: number;
@@ -44,7 +49,10 @@ const RelatoriosPage = () => {
     let prevMap: Record<string, { volumes: number; descargas: number }> = {};
     if (savedPrev && savedPrev.length > 0) {
       savedPrev.forEach((s: any) => {
-        prevMap[s.fornecedor] = { volumes: s.total_volumes, descargas: s.total_descargas };
+        const key = normalizeFornecedor(s.fornecedor);
+        if (!prevMap[key]) prevMap[key] = { volumes: 0, descargas: 0 };
+        prevMap[key].volumes += s.total_volumes || 0;
+        prevMap[key].descargas += s.total_descargas || 0;
       });
     } else {
       // Calculate from recebimentos
@@ -53,7 +61,7 @@ const RelatoriosPage = () => {
         .lte("data_prevista", prevEndDate)
         .not("status", "eq", "NAO_VEIO");
       (prevRecs || []).forEach(r => {
-        const name = r.fornecedor || "N/A";
+        const name = normalizeFornecedor(r.fornecedor);
         if (!prevMap[name]) prevMap[name] = { volumes: 0, descargas: 0 };
         prevMap[name].volumes += r.quantidade_volumes || 0;
         prevMap[name].descargas++;
@@ -63,7 +71,7 @@ const RelatoriosPage = () => {
     // Current month aggregation
     const currentMap: Record<string, { volumes: number; descargas: number; valor: number }> = {};
     (currentRecs || []).forEach(r => {
-      const name = r.fornecedor || "N/A";
+      const name = normalizeFornecedor(r.fornecedor);
       if (!currentMap[name]) currentMap[name] = { volumes: 0, descargas: 0, valor: 0 };
       currentMap[name].volumes += r.quantidade_volumes || 0;
       currentMap[name].descargas++;
