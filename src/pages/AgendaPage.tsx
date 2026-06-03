@@ -38,6 +38,7 @@ const AgendaPage = () => {
   const [entradaObs, setEntradaObs] = useState("");
   const [entradaTransportadora, setEntradaTransportadora] = useState("");
   const [valoresConfig, setValoresConfig] = useState({ valor_multa: 0 });
+  const [searchTerm, setSearchTerm] = useState("");
   const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
@@ -264,11 +265,19 @@ const AgendaPage = () => {
   const today = new Date().toISOString().split("T")[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
+  const term = searchTerm.trim().toLowerCase();
+  const filteredRecebimentos = term
+    ? recebimentos.filter(r =>
+        (r.fornecedor || "").toLowerCase().includes(term) ||
+        (r.numero_nf || "").toLowerCase().includes(term)
+      )
+    : recebimentos;
+
   const groups = [
-    { label: "Atrasados", items: recebimentos.filter(r => r.data_prevista < today && !["FINALIZADO", "NAO_VEIO"].includes(r.status)) },
-    { label: "Hoje", items: recebimentos.filter(r => r.data_prevista === today) },
-    { label: "Amanhã", items: recebimentos.filter(r => r.data_prevista === tomorrow) },
-    { label: "Próximos", items: recebimentos.filter(r => r.data_prevista > tomorrow) },
+    { label: "Atrasados", items: filteredRecebimentos.filter(r => r.data_prevista < today && !["FINALIZADO", "NAO_VEIO"].includes(r.status)) },
+    { label: "Hoje", items: filteredRecebimentos.filter(r => r.data_prevista === today) },
+    { label: "Amanhã", items: filteredRecebimentos.filter(r => r.data_prevista === tomorrow) },
+    { label: "Próximos", items: filteredRecebimentos.filter(r => r.data_prevista > tomorrow) },
   ];
 
   const renderNFs = (nf: string) => {
