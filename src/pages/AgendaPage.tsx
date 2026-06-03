@@ -472,6 +472,16 @@ const AgendaPage = () => {
         </DialogContent>
       </Dialog>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Pesquisar por fornecedor ou NF..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="bg-secondary pl-9"
+        />
+      </div>
+
       {groups.map(group => group.items.length > 0 && (
         <div key={group.label} className="space-y-3">
           <h2 className="font-heading text-lg text-foreground border-b border-border pb-1">{group.label}</h2>
