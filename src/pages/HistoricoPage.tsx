@@ -202,16 +202,15 @@ const HistoricoPage = () => {
                     <div className="p-3 cursor-pointer hover:bg-secondary/20" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-heading text-foreground text-sm">{renderNFs(r.numero_nf)}</span>
-                          </div>
+                          <h3 className="font-heading text-foreground text-base truncate" title={r.fornecedor}>{r.fornecedor || "-"}</h3>
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate">{renderNFs(r.numero_nf)}</div>
                           <div className="flex items-center gap-1.5 flex-wrap mt-1">
                             <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                             {r.is_retirada && <span className="text-xs px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-400">RET</span>}
                             {r.is_marketing && <span className="text-xs px-1 py-0.5 rounded bg-purple-500/20 text-purple-400">MKT</span>}
                             {r.is_encaixe && <span className="text-xs px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">ENC</span>}
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">{r.fornecedor} · {formatDate(r.data_prevista)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{formatDate(r.data_prevista)}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           {r.valor_cobrado > 0 && <span className="text-xs font-heading text-primary">R$ {Number(r.valor_cobrado).toFixed(2)}</span>}
@@ -316,11 +315,12 @@ const HistoricoPage = () => {
                 <div key={a.id} className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2">
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
-                      <span className="font-heading text-foreground text-sm">{renderNFs(a.recebimentos?.numero_nf || "-")}</span>
+                      <h3 className="font-heading text-foreground text-base truncate" title={a.recebimentos?.fornecedor}>{a.recebimentos?.fornecedor || "-"}</h3>
+                      <div className="text-xs text-muted-foreground mt-0.5 truncate">{renderNFs(a.recebimentos?.numero_nf || "-")}</div>
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className={`status-badge ${getStatusClass(a.status)}`}>{a.status}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">{a.recebimentos?.fornecedor} · {a.usuario_responsavel}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{a.usuario_responsavel}</p>
                       {a.hora_inicio && a.hora_fim && (
                         <p className="text-xs text-primary mt-1">
                           ⏱ {calcEffectiveArmazenagemTime(a)}
