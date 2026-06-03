@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+const normalizeFornecedor = (name: string | null | undefined): string => {
+  if (!name) return "N/A";
+  return name.trim().replace(/\s+/g, " ");
+};
+
 interface FornecedorStats {
   fornecedor: string;
   volumes: number;
