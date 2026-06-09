@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { DollarSign } from "lucide-react";
-import { formatNF } from "@/lib/helpers";
+import { FornecedorNF } from "@/components/FornecedorNF";
 
 const ValoresDescargaPage = () => {
   const { profile } = useAuth();
