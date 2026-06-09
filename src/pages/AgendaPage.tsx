@@ -489,7 +489,7 @@ const AgendaPage = () => {
             {group.items.map(r => (
               <div key={r.id} className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2">
                 <div className="space-y-1">
-                  <h3 className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
+                  <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status === "NAO_VEIO" ? "NÃO VEIO" : r.status}</span>
                     {r.is_pallet && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
@@ -497,7 +497,7 @@ const AgendaPage = () => {
                     {r.is_marketing && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">MARKETING</span>}
                     {r.is_encaixe && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">ENCAIXE</span>}
                   </div>
-                  <div className="flex flex-wrap gap-1 items-center text-xs text-muted-foreground">
+                  <div data-testid="nf-secundario" className="flex flex-wrap gap-1 items-center text-xs text-muted-foreground">
                     {renderNFs(r.numero_nf)}
                   </div>
                   <p className="text-xs text-muted-foreground">

@@ -110,8 +110,8 @@ const ValoresDescargaPage = () => {
           {recebimentos.map(r => (
             <div key={r.id} className="p-3 rounded-lg border border-border bg-card/40 flex justify-between items-center">
               <div>
-                <span className="font-heading text-foreground">{renderNFs(r.numero_nf)}</span>
-                <p className="text-xs text-muted-foreground">{r.fornecedor}</p>
+                <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
+                <p data-testid="nf-secundario" className="text-xs text-muted-foreground">{renderNFs(r.numero_nf)}</p>
               </div>
               <div className="text-right">
                 <span className="font-heading text-primary text-lg">R$ {Number(r.valor_cobrado).toFixed(2)}</span>
