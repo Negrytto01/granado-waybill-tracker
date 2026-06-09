@@ -241,23 +241,17 @@ const DescargaPage = () => {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-heading text-lg text-foreground">
-                      {r.numero_nf.includes("/") ? (
-                        <span className="flex flex-wrap gap-1.5 items-center">
-                          {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
-                            <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
-                              NF {formatNF(nf.trim())}
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        <>NF {formatNF(r.numero_nf)}</>
-                      )}
-                    </span>
+                    <h3 data-testid="fornecedor-nome" className="font-heading text-lg text-foreground leading-tight">{r.fornecedor}</h3>
                     <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                     {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
                   </div>
-                  <p className="text-sm text-muted-foreground">{r.fornecedor}</p>
+                  <div data-testid="nf-secundario" className="flex flex-wrap gap-1 items-center mt-1">
+                    {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
+                      <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs text-muted-foreground">
+                        NF {formatNF(nf.trim())}
+                      </span>
+                    ))}
+                  </div>
                   {r.observacoes && (
                     <p className="text-xs text-yellow-400 flex items-center gap-1 mt-1">
                       <MessageSquare className="h-3 w-3" /> {r.observacoes}
