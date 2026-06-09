@@ -240,12 +240,12 @@ const ArmazenagemPage = () => {
               <div key={item.id} className={`p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2 ${aging.color}`}>
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <span className="font-heading text-foreground text-sm">{renderNFs(rec?.numero_nf)}</span>
+                    <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight truncate" title={rec?.fornecedor}>{rec?.fornecedor || "-"}</h3>
+                    <div data-testid="nf-secundario" className="text-xs text-muted-foreground mt-0.5">{renderNFs(rec?.numero_nf)}</div>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       <span className={`status-badge ${getStatusClass(paused ? "PAUSADO" : item.status)}`}>{paused ? "PAUSADO" : item.status}</span>
                       <span className="text-xs text-muted-foreground">{aging.days}d — {aging.label}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{rec?.fornecedor}</p>
                   </div>
                   {isAdmin && (
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} className="text-destructive hover:text-destructive h-7 w-7">
