@@ -62,10 +62,10 @@ const CalendarioPage = () => {
             dayItems.map(r => (
               <div key={r.id} className="p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-heading text-foreground">{r.fornecedor}</span>
+                  <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
                   <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">NF {r.numero_nf}</p>
+                <p data-testid="nf-secundario" className="text-xs text-muted-foreground">NF {r.numero_nf}</p>
                 <p className="text-xs text-muted-foreground">
                   {r.horario_agenda ? `Horário: ${r.horario_agenda}` : "Sem horário definido"}
                   {r.quantidade_volumes > 0 && ` · ${r.quantidade_volumes} caixas`}
