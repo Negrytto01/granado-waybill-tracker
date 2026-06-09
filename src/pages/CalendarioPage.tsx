@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtime } from "@/hooks/useRealtime";
 import { Calendar } from "@/components/ui/calendar";
-import { formatTime, getStatusClass } from "@/lib/helpers";
+import { getStatusClass } from "@/lib/helpers";
+import { FornecedorNF } from "@/components/FornecedorNF";
 import { CalendarDays } from "lucide-react";
 
 const CalendarioPage = () => {
@@ -61,11 +62,9 @@ const CalendarioPage = () => {
           ) : (
             dayItems.map(r => (
               <div key={r.id} className="p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
-                  <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
-                </div>
-                <p data-testid="nf-secundario" className="text-xs text-muted-foreground">NF {r.numero_nf}</p>
+                <FornecedorNF fornecedor={r.fornecedor} numeroNf={r.numero_nf}>
+                  <span className={`status-badge ${getStatusClass(r.status)} ml-0 mt-1 inline-block`}>{r.status}</span>
+                </FornecedorNF>
                 <p className="text-xs text-muted-foreground">
                   {r.horario_agenda ? `Horário: ${r.horario_agenda}` : "Sem horário definido"}
                   {r.quantidade_volumes > 0 && ` · ${r.quantidade_volumes} caixas`}

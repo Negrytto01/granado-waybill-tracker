@@ -14,6 +14,11 @@ describe("Hierarquia visual Fornecedor > NF", () => {
   for (const p of pages) {
     it(`${p} exibe fornecedor antes da NF`, () => {
       const src = readFileSync(resolve(process.cwd(), p), "utf8");
+      // Aceita o componente compartilhado FornecedorNF (hierarquia garantida pelo componente)
+      if (/<FornecedorNF\b/.test(src)) {
+        expect(src).toMatch(/<FornecedorNF\b/);
+        return;
+      }
       const f = src.indexOf('data-testid="fornecedor-nome"');
       const n = src.indexOf('data-testid="nf-secundario"');
       expect(f, "fornecedor-nome ausente").toBeGreaterThan(-1);

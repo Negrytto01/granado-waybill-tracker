@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { DollarSign } from "lucide-react";
-import { formatNF } from "@/lib/helpers";
+import { FornecedorNF } from "@/components/FornecedorNF";
 
 const ValoresDescargaPage = () => {
   const { profile } = useAuth();
@@ -66,19 +66,6 @@ const ValoresDescargaPage = () => {
   }
   if (loading) return <div className="text-center py-12 text-muted-foreground animate-pulse">Carregando...</div>;
 
-  const renderNFs = (nf: string) => {
-    if (nf.includes("/")) {
-      return (
-        <span className="flex flex-wrap gap-1 items-center">
-          {nf.split(/\s*\/\s*/).map((n, i) => (
-            <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">NF {formatNF(n.trim())}</span>
-          ))}
-        </span>
-      );
-    }
-    return <span>NF {formatNF(nf)}</span>;
-  };
-
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl neon-text">Valores de Descarga</h1>
@@ -108,11 +95,8 @@ const ValoresDescargaPage = () => {
         <div className="space-y-3">
           <h2 className="font-heading text-xl text-foreground">Descargas com Valor Cobrado</h2>
           {recebimentos.map(r => (
-            <div key={r.id} className="p-3 rounded-lg border border-border bg-card/40 flex justify-between items-center">
-              <div>
-                <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
-                <p data-testid="nf-secundario" className="text-xs text-muted-foreground">{renderNFs(r.numero_nf)}</p>
-              </div>
+            <div key={r.id} className="p-3 rounded-lg border border-border bg-card/40 flex justify-between items-center gap-3">
+              <FornecedorNF fornecedor={r.fornecedor} numeroNf={r.numero_nf} />
               <div className="text-right">
                 <span className="font-heading text-primary text-lg">R$ {Number(r.valor_cobrado).toFixed(2)}</span>
                 <p className="text-xs text-muted-foreground">
