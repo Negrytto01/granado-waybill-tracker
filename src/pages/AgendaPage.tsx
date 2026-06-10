@@ -7,10 +7,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { getStatusClass, formatDate, formatTime, formatNF } from "@/lib/helpers";
+import { getStatusClass, formatDate, formatTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
 import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap, CheckCircle2, Search } from "lucide-react";
+import { FornecedorNF } from "@/components/FornecedorNF";
+import { EstornarButton } from "@/components/EstornarButton";
 
 const AgendaPage = () => {
   const { profile } = useAuth();
@@ -280,21 +282,6 @@ const AgendaPage = () => {
     { label: "Próximos", items: filteredRecebimentos.filter(r => r.data_prevista > tomorrow) },
   ];
 
-  const renderNFs = (nf: string) => {
-    if (nf.includes("/")) {
-      return (
-        <span className="flex flex-wrap gap-1.5 items-center">
-          {nf.split(/\s*\/\s*/).map((n: string, i: number) => (
-            <span key={i} className="inline-block px-2 py-0.5 rounded bg-secondary text-sm">
-              NF {formatNF(n.trim())}
-            </span>
-          ))}
-        </span>
-      );
-    }
-    return <>NF {formatNF(nf)}</>;
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -489,17 +476,15 @@ const AgendaPage = () => {
             {group.items.map(r => (
               <div key={r.id} className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2">
                 <div className="space-y-1">
-                  <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight">{r.fornecedor}</h3>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status === "NAO_VEIO" ? "NÃO VEIO" : r.status}</span>
-                    {r.is_pallet && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
-                    {r.is_retirada && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">RETIRADA</span>}
-                    {r.is_marketing && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">MARKETING</span>}
-                    {r.is_encaixe && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">ENCAIXE</span>}
-                  </div>
-                  <div data-testid="nf-secundario" className="flex flex-wrap gap-1 items-center text-xs text-muted-foreground">
-                    {renderNFs(r.numero_nf)}
-                  </div>
+                  <FornecedorNF fornecedor={r.fornecedor} numeroNf={r.numero_nf} size="md">
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status === "NAO_VEIO" ? "NÃO VEIO" : r.status}</span>
+                      {r.is_pallet && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
+                      {r.is_retirada && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">RETIRADA</span>}
+                      {r.is_marketing && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">MARKETING</span>}
+                      {r.is_encaixe && <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">ENCAIXE</span>}
+                    </div>
+                  </FornecedorNF>
                   <p className="text-xs text-muted-foreground">
                     Previsto: {formatDate(r.data_prevista)}
                     {r.horario_agenda && ` às ${r.horario_agenda.substring(0, 5)}`}
@@ -530,6 +515,7 @@ const AgendaPage = () => {
                           <CheckCircle2 className="mr-1 h-3 w-3" /> Entrada Completa
                         </Button>
                       )}
+                      <EstornarButton recebimento={r} onDone={fetchData} />
                       <Button size="sm" variant="ghost" onClick={() => openEdit(r)} className="text-muted-foreground hover:text-foreground h-7 w-7 p-0">
                         <Edit className="h-3 w-3" />
                       </Button>
