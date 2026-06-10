@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { getStatusClass, formatNF, calcEffectiveArmazenagemTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { Package, Trash2, Pause, Play, CheckCircle, Plus, Wrench } from "lucide-react";
+import { FornecedorNF } from "@/components/FornecedorNF";
+import { EstornarButton } from "@/components/EstornarButton";
 
 const getAgingColor = (dataCriacao: string): { color: string; label: string; days: number } => {
   const days = Math.floor((Date.now() - new Date(dataCriacao).getTime()) / 86400000);
@@ -160,19 +162,6 @@ const ArmazenagemPage = () => {
     fetchData();
   };
 
-  const renderNFs = (nf: string) => {
-    if (nf?.includes("/")) {
-      return (
-        <span className="flex flex-wrap gap-1 items-center">
-          {nf.split(/\s*\/\s*/).map((n: string, i: number) => (
-            <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">NF {formatNF(n.trim())}</span>
-          ))}
-        </span>
-      );
-    }
-    return <>NF {nf ? formatNF(nf) : "-"}</>;
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -240,18 +229,21 @@ const ArmazenagemPage = () => {
               <div key={item.id} className={`p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2 ${aging.color}`}>
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <h3 data-testid="fornecedor-nome" className="font-heading text-foreground text-base leading-tight truncate" title={rec?.fornecedor}>{rec?.fornecedor || "-"}</h3>
-                    <div data-testid="nf-secundario" className="text-xs text-muted-foreground mt-0.5">{renderNFs(rec?.numero_nf)}</div>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <span className={`status-badge ${getStatusClass(paused ? "PAUSADO" : item.status)}`}>{paused ? "PAUSADO" : item.status}</span>
-                      <span className="text-xs text-muted-foreground">{aging.days}d — {aging.label}</span>
-                    </div>
+                    <FornecedorNF fornecedor={rec?.fornecedor} numeroNf={rec?.numero_nf} size="md">
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className={`status-badge ${getStatusClass(paused ? "PAUSADO" : item.status)}`}>{paused ? "PAUSADO" : item.status}</span>
+                        <span className="text-xs text-muted-foreground">{aging.days}d — {aging.label}</span>
+                      </div>
+                    </FornecedorNF>
                   </div>
-                  {isAdmin && (
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} className="text-destructive hover:text-destructive h-7 w-7">
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {rec?.id && <EstornarButton recebimento={{ id: item.recebimento_id, fornecedor: rec?.fornecedor, numero_nf: rec?.numero_nf, status: "EM ARMAZENAGEM" }} iconOnly variant="ghost" />}
+                    {isAdmin && (
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} className="text-destructive hover:text-destructive h-7 w-7">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-1 text-xs">
                   <div><span className="text-muted-foreground">Vol:</span> <span className="text-foreground">{item.quantidade_volumes}</span></div>
