@@ -10,6 +10,8 @@ import { formatDate, formatDateTime, formatTime, formatNF, getStatusClass, calcD
 import { useRealtime } from "@/hooks/useRealtime";
 import { ChevronDown, ChevronUp, Trash2, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { FornecedorNF } from "@/components/FornecedorNF";
+import { EstornarButton } from "@/components/EstornarButton";
 
 const HistoricoPage = () => {
   const { profile } = useAuth();
@@ -160,19 +162,6 @@ const HistoricoPage = () => {
     fetchAll();
   };
 
-  const renderNFs = (nf: string) => {
-    if (nf.includes("/")) {
-      return (
-        <span className="flex flex-wrap gap-1 items-center">
-          {nf.split(/\s*\/\s*/).map((n: string, i: number) => (
-            <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs">NF {formatNF(n.trim())}</span>
-          ))}
-        </span>
-      );
-    }
-    return <>NF {formatNF(nf)}</>;
-  };
-
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl neon-text">Histórico</h1>
@@ -202,20 +191,23 @@ const HistoricoPage = () => {
                     <div className="p-3 cursor-pointer hover:bg-secondary/20" onClick={() => setExpandedId(isExpanded ? null : r.id)}>
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-heading text-foreground text-base truncate" title={r.fornecedor}>{r.fornecedor || "-"}</h3>
-                          <div className="text-xs text-muted-foreground mt-0.5 truncate">{renderNFs(r.numero_nf)}</div>
-                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                            <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
-                            {r.is_retirada && <span className="text-xs px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-400">RET</span>}
-                            {r.is_marketing && <span className="text-xs px-1 py-0.5 rounded bg-purple-500/20 text-purple-400">MKT</span>}
-                            {r.is_encaixe && <span className="text-xs px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">ENC</span>}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">{formatDate(r.data_prevista)}</p>
+                          <FornecedorNF fornecedor={r.fornecedor} numeroNf={r.numero_nf} size="md">
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                              <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                              {r.is_retirada && <span className="text-xs px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-400">RET</span>}
+                              {r.is_marketing && <span className="text-xs px-1 py-0.5 rounded bg-purple-500/20 text-purple-400">MKT</span>}
+                              {r.is_encaixe && <span className="text-xs px-1 py-0.5 rounded bg-orange-500/20 text-orange-400">ENC</span>}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{formatDate(r.data_prevista)}</p>
+                          </FornecedorNF>
                         </div>
                         <div className="flex items-center gap-1">
                           {r.valor_cobrado > 0 && <span className="text-xs font-heading text-primary">R$ {Number(r.valor_cobrado).toFixed(2)}</span>}
                           {isAdmin && (
                             <>
+                              <span onClick={(e) => e.stopPropagation()}>
+                                <EstornarButton recebimento={r} onDone={fetchAll} iconOnly variant="ghost" />
+                              </span>
                               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditRec(r); }} className="text-muted-foreground hover:text-foreground h-7 w-7">
                                 <Edit className="h-3 w-3" />
                               </Button>
@@ -315,8 +307,7 @@ const HistoricoPage = () => {
                 <div key={a.id} className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-2">
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-heading text-foreground text-base truncate" title={a.recebimentos?.fornecedor}>{a.recebimentos?.fornecedor || "-"}</h3>
-                      <div className="text-xs text-muted-foreground mt-0.5 truncate">{renderNFs(a.recebimentos?.numero_nf || "-")}</div>
+                      <FornecedorNF fornecedor={a.recebimentos?.fornecedor} numeroNf={a.recebimentos?.numero_nf} size="md" />
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className={`status-badge ${getStatusClass(a.status)}`}>{a.status}</span>
                       </div>

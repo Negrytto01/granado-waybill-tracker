@@ -12,6 +12,8 @@ import { getStatusClass, formatTime, calcDuration, formatNF } from "@/lib/helper
 import { useRealtime } from "@/hooks/useRealtime";
 import { playDescargaFinalizada } from "@/lib/sounds";
 import { Play, Truck, Link, Unlink, CheckCircle, MessageSquare, Plus, X, ClipboardCheck } from "lucide-react";
+import { FornecedorNF } from "@/components/FornecedorNF";
+import { EstornarButton } from "@/components/EstornarButton";
 
 interface NFVerification {
   nf: string;
@@ -240,18 +242,12 @@ const DescargaPage = () => {
             <div key={r.id} className="p-4 rounded-lg border border-border bg-card/60 backdrop-blur-sm space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 data-testid="fornecedor-nome" className="font-heading text-lg text-foreground leading-tight">{r.fornecedor}</h3>
-                    <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
-                    {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
-                  </div>
-                  <div data-testid="nf-secundario" className="flex flex-wrap gap-1 items-center mt-1">
-                    {r.numero_nf.split(/\s*\/\s*/).map((nf: string, i: number) => (
-                      <span key={i} className="inline-block px-1.5 py-0.5 rounded bg-secondary text-xs text-muted-foreground">
-                        NF {formatNF(nf.trim())}
-                      </span>
-                    ))}
-                  </div>
+                  <FornecedorNF fornecedor={r.fornecedor} numeroNf={r.numero_nf} size="lg">
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                      <span className={`status-badge ${getStatusClass(r.status)}`}>{r.status}</span>
+                      {r.is_pallet && <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">PALLET</span>}
+                    </div>
+                  </FornecedorNF>
                   {r.observacoes && (
                     <p className="text-xs text-yellow-400 flex items-center gap-1 mt-1">
                       <MessageSquare className="h-3 w-3" /> {r.observacoes}
@@ -259,9 +255,12 @@ const DescargaPage = () => {
                   )}
                   {r.nfd_numero && <p className="text-xs text-red-400 mt-1">NFD: {formatNF(r.nfd_numero)}</p>}
                 </div>
-                {isAdmin && (
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(r.id)} className="text-destructive hover:text-destructive">Remover</Button>
-                )}
+                <div className="flex items-center gap-2">
+                  <EstornarButton recebimento={r} />
+                  {isAdmin && (
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(r.id)} className="text-destructive hover:text-destructive">Remover</Button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                 <div><span className="text-muted-foreground">Chegada:</span> <span className="text-foreground">{formatTime(r.hora_chegada)}</span></div>
