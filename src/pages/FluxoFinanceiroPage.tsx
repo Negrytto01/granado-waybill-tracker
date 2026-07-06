@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Trash2, RefreshCw } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, Receipt } from "lucide-react";
 import { formatDateTime, formatNF } from "@/lib/helpers";
 
 const FluxoFinanceiroPage = () => {
@@ -98,6 +98,43 @@ const FluxoFinanceiroPage = () => {
     if (error) { toast.error(error.message); return; }
     toast.success("Removido!");
     fetchData();
+  };
+
+  const gerarRecibo = async (f: any) => {
+    if (!f.recebimento_id) { toast.error("Este lançamento não está vinculado a um recebimento."); return; }
+    const { data: r, error } = await supabase.from("recebimentos").select("transportadora, fornecedor, numero_nf, valor_cobrado").eq("id", f.recebimento_id).maybeSingle();
+    if (error || !r) { toast.error("Não foi possível carregar os dados do recebimento."); return; }
+    const valor = Number(f.valor || r.valor_cobrado || 0);
+    const valorFmt = valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const nfsRaw = (r.numero_nf || "").split(/\s*\/\s*/).map((s: string) => s.trim()).filter(Boolean);
+    const nfsFmt = nfsRaw.map((n: string) => formatNF(n)).join(" / ") || "-";
+    const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const hoje = new Date();
+    const dataFmt = `Sorocaba, ${String(hoje.getDate()).padStart(2, "0")} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}`;
+    const transportadora = r.transportadora || "________________________________";
+    const fornecedor = r.fornecedor || "-";
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Recibo de Descarga</title>
+<style>
+  @page { size: A4; margin: 25mm; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: #111; max-width: 720px; margin: 0 auto; padding: 24px; line-height: 1.7; }
+  h1 { text-align: center; letter-spacing: 4px; font-size: 22px; margin: 0 0 40px; text-transform: uppercase; border-bottom: 2px solid #111; padding-bottom: 12px; }
+  p { font-size: 16px; text-align: justify; margin: 0 0 32px; }
+  strong { font-weight: bold; }
+  .data { margin-top: 60px; }
+  .assinatura { margin-top: 60px; }
+  .actions { text-align: center; margin-top: 32px; }
+  button { font-size: 14px; padding: 8px 20px; cursor: pointer; margin: 0 4px; }
+  @media print { .actions { display: none; } }
+</style></head><body>
+<h1>Recibo de Descarga</h1>
+<p>Recebemos da Transportadora <strong>${transportadora}</strong> a quantia de <strong>R$ ${valorFmt}</strong> referente à descarga da NF nº <strong>${nfsFmt}</strong> da <strong>${fornecedor}</strong>.</p>
+<p class="data">${dataFmt}</p>
+<p class="assinatura">Ass.:____________________________________</p>
+<div class="actions"><button onclick="window.print()">Imprimir / Salvar PDF</button><button onclick="window.close()">Fechar</button></div>
+</body></html>`;
+    const w = window.open("", "_blank", "width=800,height=900");
+    if (!w) { toast.error("Permita pop-ups para gerar o recibo."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   };
 
   const renderNFsInDescription = (desc: string) => {
@@ -196,6 +233,11 @@ const FluxoFinanceiroPage = () => {
               <span className={`font-heading text-lg ${f.tipo === "ENTRADA" ? "text-emerald-400" : "text-red-400"}`}>
                 {f.tipo === "ENTRADA" ? "+" : "-"} R$ {Number(f.valor).toFixed(2)}
               </span>
+              {f.tipo === "ENTRADA" && f.recebimento_id && (
+                <Button variant="ghost" size="icon" onClick={() => gerarRecibo(f)} title="Gerar recibo de descarga" className="text-primary hover:text-primary">
+                  <Receipt className="h-4 w-4" />
+                </Button>
+              )}
               {isAdmin && (
                 <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="text-destructive hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
