@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { DollarSign, Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, Receipt } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, TrendingDown, Trash2, RefreshCw, Receipt, Download, Printer } from "lucide-react";
 import { formatDateTime, formatNF } from "@/lib/helpers";
+import { buildRecibo, type ReciboData } from "@/lib/recibo";
+import jsPDF from "jspdf";
 
 const FluxoFinanceiroPage = () => {
   const { profile } = useAuth();
@@ -14,7 +16,7 @@ const FluxoFinanceiroPage = () => {
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState({ descricao: "", valor: "" });
   const [mesRef, setMesRef] = useState(new Date().toISOString().slice(0, 7));
-  const [recibo, setRecibo] = useState<null | { transportadora: string; valorFmt: string; nfsFmt: string; fornecedor: string; dataFmt: string }>(null);
+  const [recibo, setRecibo] = useState<null | ReciboData>(null);
   const isAdmin = profile?.cargo === "Master";
 
   const fetchData = useCallback(async () => {
@@ -101,20 +103,60 @@ const FluxoFinanceiroPage = () => {
     fetchData();
   };
 
-  const gerarRecibo = async (f: any) => {
-    if (!f.recebimento_id) { toast.error("Este lançamento não está vinculado a um recebimento."); return; }
+  const carregarRecebimento = async (f: any): Promise<ReciboData | null> => {
+    if (!f.recebimento_id) { toast.error("Este lançamento não está vinculado a um recebimento."); return null; }
     const { data: r, error } = await supabase.from("recebimentos").select("transportadora, fornecedor, numero_nf, valor_cobrado").eq("id", f.recebimento_id).maybeSingle();
-    if (error || !r) { toast.error("Não foi possível carregar os dados do recebimento."); return; }
-    const valor = Number(f.valor || r.valor_cobrado || 0);
-    const valorFmt = valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const nfsRaw = (r.numero_nf || "").split(/\s*\/\s*/).map((s: string) => s.trim()).filter(Boolean);
-    const nfsFmt = nfsRaw.map((n: string) => formatNF(n)).join(" / ") || "-";
-    const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    const hoje = new Date();
-    const dataFmt = `Sorocaba, ${String(hoje.getDate()).padStart(2, "0")} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}`;
-    const transportadora = r.transportadora || "________________________________";
-    const fornecedor = r.fornecedor || "-";
-    setRecibo({ transportadora, valorFmt, nfsFmt, fornecedor, dataFmt });
+    if (error || !r) { toast.error("Não foi possível carregar os dados do recebimento."); return null; }
+    return buildRecibo({
+      transportadora: r.transportadora,
+      valor: Number(f.valor || r.valor_cobrado || 0),
+      numeroNf: r.numero_nf,
+      fornecedor: r.fornecedor,
+    });
+  };
+
+  const gerarRecibo = async (f: any) => {
+    const data = await carregarRecebimento(f);
+    if (data) setRecibo(data);
+  };
+
+  const construirPdf = (data: ReciboData): jsPDF => {
+    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const margin = 25;
+    const contentW = pageW - margin * 2;
+
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(18);
+    pdf.text("RECIBO DE DESCARGA", pageW / 2, 35, { align: "center" });
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, 40, pageW - margin, 40);
+
+    pdf.setFont("times", "normal");
+    pdf.setFontSize(12);
+    const corpo = `Recebemos da Transportadora ${data.transportadora} a quantia de R$ ${data.valorFmt} referente à descarga da NF nº ${data.nfsFmt} da ${data.fornecedor}.`;
+    const linhas = pdf.splitTextToSize(corpo, contentW);
+    pdf.text(linhas, margin, 60, { align: "justify", maxWidth: contentW });
+
+    const yData = 60 + linhas.length * 7 + 30;
+    pdf.text(data.dataFmt, margin, yData);
+    pdf.text("Ass.: ____________________________________", margin, yData + 30);
+    return pdf;
+  };
+
+  const baixarPdf = async (f: any) => {
+    const data = await carregarRecebimento(f);
+    if (!data) return;
+    const pdf = construirPdf(data);
+    const nomeArquivo = `recibo-${data.nfsFmt.replace(/[^\d]/g, "-") || "descarga"}.pdf`;
+    pdf.save(nomeArquivo);
+    toast.success("PDF gerado!");
+  };
+
+  const baixarPdfAtual = () => {
+    if (!recibo) return;
+    const pdf = construirPdf(recibo);
+    pdf.save(`recibo-${recibo.nfsFmt.replace(/[^\d]/g, "-") || "descarga"}.pdf`);
   };
 
   const imprimirRecibo = () => {
@@ -245,9 +287,14 @@ const FluxoFinanceiroPage = () => {
                 {f.tipo === "ENTRADA" ? "+" : "-"} R$ {Number(f.valor).toFixed(2)}
               </span>
               {f.tipo === "ENTRADA" && f.recebimento_id && (
-                <Button variant="ghost" size="icon" onClick={() => gerarRecibo(f)} title="Gerar recibo de descarga" className="text-primary hover:text-primary">
-                  <Receipt className="h-4 w-4" />
-                </Button>
+                <>
+                  <Button variant="ghost" size="icon" onClick={() => gerarRecibo(f)} title="Prévia do recibo" className="text-primary hover:text-primary">
+                    <Receipt className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => baixarPdf(f)} title="Baixar PDF do recibo" className="text-primary hover:text-primary">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </>
               )}
               {isAdmin && (
                 <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="text-destructive hover:text-destructive">
@@ -278,7 +325,12 @@ const FluxoFinanceiroPage = () => {
           )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setRecibo(null)} className="text-black">Fechar</Button>
-            <Button onClick={imprimirRecibo} className="bg-primary text-primary-foreground">Imprimir / Salvar PDF</Button>
+            <Button variant="outline" onClick={imprimirRecibo} className="text-black">
+              <Printer className="mr-2 h-4 w-4" /> Imprimir
+            </Button>
+            <Button onClick={baixarPdfAtual} className="bg-primary text-primary-foreground">
+              <Download className="mr-2 h-4 w-4" /> Baixar PDF
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
