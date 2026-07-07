@@ -202,7 +202,7 @@ const FluxoFinanceiroPage = () => {
     pdf.setFont("times", "normal");
     pdf.setFontSize(12);
     pdf.setTextColor(30);
-    const corpo = `Recebemos da Transportadora ${data.transportadora} a quantia de R$ ${data.valorFmt} (${porExtenso(data.valorFmt)}) referente à descarga da NF nº ${data.nfsFmt} da ${data.fornecedor}.`;
+    const corpo = `Recebemos da Transportadora ${data.transportadora} a quantia de R$ ${data.valorFmt} referente à descarga da NF nº ${data.nfsFmt} da ${data.fornecedor}.`;
     const linhas = pdf.splitTextToSize(corpo, contentW);
     pdf.text(linhas, margin, margin + 60, { align: "justify", maxWidth: contentW });
 
