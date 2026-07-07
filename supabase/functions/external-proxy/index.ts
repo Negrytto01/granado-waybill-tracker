@@ -77,6 +77,27 @@ Deno.serve(async (req) => {
 
     if (operacao === "custom") {
       if (!endpoint) throw new Error("endpoint é obrigatório para operação custom");
+      // SSRF protection: se o caller passar uma URL absoluta, o host DEVE bater com base_url.
+      if (/^https?:\/\//i.test(endpoint)) {
+        try {
+          const provided = new URL(endpoint);
+          const base = new URL(integ.base_url);
+          if (provided.host.toLowerCase() !== base.host.toLowerCase() || provided.protocol !== base.protocol) {
+            throw new Error("endpoint fora do host permitido pela integração");
+          }
+          // Bloqueia hosts internos/loopback mesmo quando base_url estiver mal configurado.
+          const h = provided.hostname.toLowerCase();
+          if (
+            h === "localhost" || h === "0.0.0.0" || h === "::1" ||
+            h.startsWith("127.") || h.startsWith("10.") || h.startsWith("192.168.") ||
+            h === "169.254.169.254" || /^172\.(1[6-9]|2\d|3[0-1])\./.test(h)
+          ) {
+            throw new Error("endpoint aponta para host interno bloqueado");
+          }
+        } catch (e) {
+          throw new Error("endpoint inválido: " + (e as Error).message);
+        }
+      }
       resolvedPath = endpoint;
       resolvedMethod = (metodo || "GET").toUpperCase();
     } else {

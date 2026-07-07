@@ -28,10 +28,13 @@ Deno.serve(async (req) => {
   const { data: integ } = await supabase.from("integracoes_externas").select("*").eq("id", integracaoId).eq("ativo", true).maybeSingle();
   if (!integ) return json({ error: "Integração não encontrada" }, 404);
 
-  // Valida secret opcional
-  if (integ.webhook_secret) {
-    const provided = req.headers.get("x-webhook-secret");
-    if (provided !== integ.webhook_secret) return json({ error: "Secret inválido" }, 401);
+  // Secret é OBRIGATÓRIO — integrações sem secret não aceitam webhooks.
+  if (!integ.webhook_secret) {
+    return json({ error: "Webhook desabilitado: configure um webhook_secret na integração" }, 401);
+  }
+  const provided = req.headers.get("x-webhook-secret");
+  if (!provided || provided !== integ.webhook_secret) {
+    return json({ error: "Secret inválido" }, 401);
   }
 
   let body: any;
