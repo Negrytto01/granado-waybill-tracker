@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { getStatusClass, formatDate, formatTime } from "@/lib/helpers";
 import { useRealtime } from "@/hooks/useRealtime";
 import { playTruckArrival } from "@/lib/sounds";
-import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap, CheckCircle2, Search } from "lucide-react";
+import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap, CheckCircle2, Search, Sparkles, Loader2 } from "lucide-react";
 import { FornecedorNF } from "@/components/FornecedorNF";
 import { EstornarButton } from "@/components/EstornarButton";
 
@@ -42,6 +42,30 @@ const AgendaPage = () => {
   const [valoresConfig, setValoresConfig] = useState({ valor_multa: 0 });
   const [searchTerm, setSearchTerm] = useState("");
   const isAdmin = profile?.cargo === "Master";
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSugestao, setAiSugestao] = useState<any>(null);
+  const [aiErro, setAiErro] = useState<string | null>(null);
+
+  const handleSugerirIA = async () => {
+    setAiErro(null);
+    setAiSugestao(null);
+    if (!fornecedor.trim()) { toast.error("Preencha o fornecedor"); return; }
+    const vol = Number(volumesTotal || 0);
+    if (!vol || vol <= 0) { toast.error("Preencha o volume total"); return; }
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("assistente-agenda", {
+        body: { fornecedor, volumes: vol },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setAiSugestao(data);
+    } catch (e: any) {
+      setAiErro("Não foi possível gerar sugestão no momento, tente preencher manualmente");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from("recebimentos").select("*").order("data_prevista", { ascending: true }).order("data_criacao", { ascending: false });
