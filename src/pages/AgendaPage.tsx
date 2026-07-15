@@ -384,6 +384,65 @@ const AgendaPage = () => {
                 </div>
 
                 <Button onClick={handleCreate} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">Salvar</Button>
+
+                {!isEncaixe && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSugerirIA}
+                      disabled={aiLoading}
+                      className="w-full"
+                    >
+                      {aiLoading ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando agenda...</>
+                      ) : (
+                        <><Sparkles className="mr-2 h-4 w-4" /> Sugerir horário com IA</>
+                      )}
+                    </Button>
+
+                    {aiErro && (
+                      <div className="p-3 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
+                        {aiErro}
+                      </div>
+                    )}
+
+                    {aiSugestao?.sugestao_principal && (
+                      <div className="p-3 rounded-lg border border-primary/40 bg-primary/5 space-y-2">
+                        <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                          <Sparkles className="h-4 w-4" /> Sugestão da IA
+                        </div>
+                        <div className="text-sm text-foreground">
+                          <strong>{aiSugestao.sugestao_principal.data}</strong>
+                          {" · "}
+                          <strong>{aiSugestao.sugestao_principal.horario_inicio} – {aiSugestao.sugestao_principal.horario_fim}</strong>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{aiSugestao.sugestao_principal.justificativa}</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setDataPrevista(aiSugestao.sugestao_principal.data);
+                            setHorarioAgenda(aiSugestao.sugestao_principal.horario_inicio);
+                            toast.success("Horário preenchido");
+                          }}
+                        >
+                          Usar este horário
+                        </Button>
+                        {aiSugestao.sugestao_alternativa && (
+                          <div className="pt-2 mt-2 border-t border-border/50">
+                            <p className="text-xs text-muted-foreground mb-1">Alternativa:</p>
+                            <div className="text-sm">
+                              {aiSugestao.sugestao_alternativa.data} · {aiSugestao.sugestao_alternativa.horario_inicio} – {aiSugestao.sugestao_alternativa.horario_fim}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{aiSugestao.sugestao_alternativa.justificativa}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
