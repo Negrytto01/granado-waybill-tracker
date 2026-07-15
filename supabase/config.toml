@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.external-webhook]
 verify_jwt = false
+
+[functions.assistente-agenda]
+verify_jwt = false
