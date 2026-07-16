@@ -256,6 +256,7 @@ REGRAS:
       console.error(`Anthropic ${resp.status}: ${err}`);
       return new Response(JSON.stringify({
         duracao_estimada_min: duracaoMin,
+        dados_extraidos: { fornecedor, volumes, restricoes: pedidoLivre },
         ...sugestaoFallback(dias, duracaoMin),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -267,6 +268,7 @@ REGRAS:
       console.error("Resposta do modelo sem JSON", texto);
       return new Response(JSON.stringify({
         duracao_estimada_min: duracaoMin,
+        dados_extraidos: { fornecedor, volumes, restricoes: pedidoLivre },
         ...sugestaoFallback(dias, duracaoMin),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
