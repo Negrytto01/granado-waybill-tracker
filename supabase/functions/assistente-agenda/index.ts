@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       .select("data_prevista, horario_agenda, quantidade_volumes, fornecedor, status")
       .gte("data_prevista", hoje)
       .lte("data_prevista", ate)
-      .not("status", "in", "(CANCELADO,FINALIZADO)")
+      .not("status", "in", "(FINALIZADO,NAO_VEIO)")
       .not("horario_agenda", "is", null);
 
     if (error) throw error;
