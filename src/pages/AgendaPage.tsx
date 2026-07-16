@@ -431,14 +431,42 @@ const AgendaPage = () => {
                           Usar este horário
                         </Button>
                         {aiSugestao.sugestao_alternativa && (
-                          <div className="pt-2 mt-2 border-t border-border/50">
-                            <p className="text-xs text-muted-foreground mb-1">Alternativa:</p>
+                          <div className="pt-2 mt-2 border-t border-border/50 space-y-2">
+                            <p className="text-xs text-muted-foreground">Alternativa:</p>
                             <div className="text-sm">
-                              {aiSugestao.sugestao_alternativa.data} · {aiSugestao.sugestao_alternativa.horario_inicio} – {aiSugestao.sugestao_alternativa.horario_fim}
+                              <strong>{aiSugestao.sugestao_alternativa.data}</strong>
+                              {" · "}
+                              <strong>{aiSugestao.sugestao_alternativa.horario_inicio} – {aiSugestao.sugestao_alternativa.horario_fim}</strong>
                             </div>
                             <p className="text-xs text-muted-foreground">{aiSugestao.sugestao_alternativa.justificativa}</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setDataPrevista(aiSugestao.sugestao_alternativa.data);
+                                setHorarioAgenda(aiSugestao.sugestao_alternativa.horario_inicio);
+                                toast.success("Horário preenchido");
+                              }}
+                            >
+                              Usar esta opção
+                            </Button>
                           </div>
                         )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleSugerirIA}
+                          disabled={aiLoading}
+                          className="w-full mt-1"
+                        >
+                          {aiLoading ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Buscando...</>
+                          ) : (
+                            <>Buscar outro horário</>
+                          )}
+                        </Button>
                       </div>
                     )}
                   </div>
