@@ -69,6 +69,45 @@ function janelasQueCabem(livres: Array<[number, number]>, duracaoMin: number): A
   return livres.filter(([a, b]) => b - a >= duracaoMin).map(([a, b]) => [a, a + duracaoMin] as [number, number]);
 }
 
+type Dia = { iso: string; dow: number; label: string; janelas: [number, number][]; ocupados: [number, number][]; livres: [number, number][]; sugestoes: [number, number][] };
+
+function sugestaoDeSlot(dia: Dia, slot: [number, number], justificativa: string) {
+  return {
+    data: dia.iso,
+    horario_inicio: fromMin(slot[0]),
+    horario_fim: fromMin(slot[1]),
+    justificativa,
+  };
+}
+
+function sugestaoFallback(dias: Dia[], duracaoMin: number) {
+  const slots = dias.flatMap((dia) => dia.sugestoes.map((slot) => ({ dia, slot })));
+  if (slots.length === 0) {
+    throw new Error("Nenhum horário disponível para a duração necessária nos próximos 14 dias.");
+  }
+
+  const principal = slots[0];
+  const alternativa = slots[1] || slots[0];
+  const duracaoTxt = duracaoMin === 150 ? "2h30" : "1h30";
+
+  return {
+    sugestao_principal: sugestaoDeSlot(
+      principal.dia,
+      principal.slot,
+      `Primeiro horário livre encontrado na Doca 2 com duração estimada de ${duracaoTxt}, respeitando a agenda já ocupada.`
+    ),
+    sugestao_alternativa: sugestaoDeSlot(
+      alternativa.dia,
+      alternativa.slot,
+      alternativa === principal
+        ? `Não há uma segunda opção diferente nos próximos 14 dias; esta é a janela disponível para ${duracaoTxt}.`
+        : `Próxima janela livre encontrada para ${duracaoTxt}, sem sobrepor outros agendamentos.`
+    ),
+    origem: "calculo_disponibilidade",
+    aviso: "A sugestão foi calculada pela disponibilidade da agenda porque a IA externa não respondeu no momento.",
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") {
@@ -110,7 +149,6 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     // Monta mapa de ocupação
-    type Dia = { iso: string; dow: number; label: string; janelas: [number, number][]; ocupados: [number, number][]; livres: [number, number][]; sugestoes: [number, number][] };
     const dias: Dia[] = [];
     for (let i = 0; i <= 14; i++) {
       const d = dataSP(i);
@@ -180,13 +218,23 @@ REGRAS:
 
     if (!resp.ok) {
       const err = await resp.text();
-      throw new Error(`Anthropic ${resp.status}: ${err}`);
+      console.error(`Anthropic ${resp.status}: ${err}`);
+      return new Response(JSON.stringify({
+        duracao_estimada_min: duracaoMin,
+        ...sugestaoFallback(dias, duracaoMin),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const data = await resp.json();
     const texto: string = data.content?.[0]?.text || "";
     const match = texto.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("Resposta do modelo sem JSON: " + texto);
+    if (!match) {
+      console.error("Resposta do modelo sem JSON", texto);
+      return new Response(JSON.stringify({
+        duracao_estimada_min: duracaoMin,
+        ...sugestaoFallback(dias, duracaoMin),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const sugestao = JSON.parse(match[0]);
 
     return new Response(JSON.stringify({
