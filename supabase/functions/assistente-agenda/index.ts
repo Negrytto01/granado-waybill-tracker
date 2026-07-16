@@ -119,12 +119,47 @@ Deno.serve(async (req) => {
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
     const body = await req.json();
-    const fornecedor: string = body.fornecedor || "";
-    const volumes: number = Number(body.volumes || body.quantidade_volumes || 0);
-    const pedidoLivre: string = body.pedido_livre || body.observacao || "";
+    let fornecedor: string = body.fornecedor || "";
+    let volumes: number = Number(body.volumes || body.quantidade_volumes || 0);
+    let pedidoLivre: string = body.pedido_livre || body.observacao || "";
+    const textoLivre: string = (body.texto_livre || body.mensagem || "").toString().trim();
 
-    if (!fornecedor) throw new Error("Campo 'fornecedor' obrigatório");
-    if (!volumes || volumes <= 0) throw new Error("Campo 'volumes' obrigatório e > 0");
+    // Se veio texto livre e faltam campos, pede ao Claude para extrair
+    if (textoLivre && (!fornecedor || !volumes)) {
+      const extractPrompt = `Extraia os dados de agendamento da mensagem do usuário e responda SOMENTE em JSON:
+{"fornecedor": string, "volumes": number, "restricoes": string}
+
+- "fornecedor": nome do fornecedor citado (ex: "Bauducco", "Pandurata"). Vazio se não citado.
+- "volumes": quantidade de volumes/caixas mencionada. 0 se não citado.
+- "restricoes": qualquer restrição de horário/dia (ex: "só de manhã", "essa semana", "até quinta"). Vazio se nenhuma.
+
+Mensagem: "${textoLivre}"`;
+      try {
+        const ex = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 300,
+            messages: [{ role: "user", content: extractPrompt }],
+          }),
+        });
+        if (ex.ok) {
+          const j = await ex.json();
+          const t: string = j.content?.[0]?.text || "";
+          const m = t.match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = JSON.parse(m[0]);
+            if (!fornecedor && parsed.fornecedor) fornecedor = String(parsed.fornecedor);
+            if (!volumes && parsed.volumes) volumes = Number(parsed.volumes) || 0;
+            if (!pedidoLivre && parsed.restricoes) pedidoLivre = String(parsed.restricoes);
+          }
+        }
+      } catch (_) { /* segue com o que tiver */ }
+    }
+
+    if (!fornecedor) throw new Error("Não consegui identificar o fornecedor. Cite o nome (ex: Bauducco).");
+    if (!volumes || volumes <= 0) throw new Error("Não consegui identificar a quantidade de volumes. Informe um número (ex: 800 volumes).");
 
     const duracaoMin = volumes >= 1000 ? 150 : 90;
 
@@ -221,6 +256,7 @@ REGRAS:
       console.error(`Anthropic ${resp.status}: ${err}`);
       return new Response(JSON.stringify({
         duracao_estimada_min: duracaoMin,
+        dados_extraidos: { fornecedor, volumes, restricoes: pedidoLivre },
         ...sugestaoFallback(dias, duracaoMin),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -232,6 +268,7 @@ REGRAS:
       console.error("Resposta do modelo sem JSON", texto);
       return new Response(JSON.stringify({
         duracao_estimada_min: duracaoMin,
+        dados_extraidos: { fornecedor, volumes, restricoes: pedidoLivre },
         ...sugestaoFallback(dias, duracaoMin),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -239,6 +276,7 @@ REGRAS:
 
     return new Response(JSON.stringify({
       duracao_estimada_min: duracaoMin,
+      dados_extraidos: { fornecedor, volumes, restricoes: pedidoLivre },
       ...sugestao,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
