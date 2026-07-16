@@ -13,6 +13,7 @@ import { playTruckArrival } from "@/lib/sounds";
 import { Plus, Truck, Trash2, Edit, X, PackagePlus, Ban, Zap, CheckCircle2, Search, Sparkles, Loader2 } from "lucide-react";
 import { FornecedorNF } from "@/components/FornecedorNF";
 import { EstornarButton } from "@/components/EstornarButton";
+import FloatingAgendaChat from "@/components/FloatingAgendaChat";
 
 const AgendaPage = () => {
   const { profile } = useAuth();
@@ -75,6 +76,20 @@ const AgendaPage = () => {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      if (d.fornecedor) setFornecedor(String(d.fornecedor));
+      if (d.volumes) setVolumesTotal(String(d.volumes));
+      if (d.data) setDataPrevista(String(d.data));
+      if (d.horario) setHorarioAgenda(String(d.horario).slice(0, 5));
+      setIsEncaixe(false);
+      setOpenNew(true);
+    };
+    window.addEventListener("agenda:prefill", handler as EventListener);
+    return () => window.removeEventListener("agenda:prefill", handler as EventListener);
+  }, []);
 
   useRealtime("recebimentos", fetchData, {
     onUpdate: (newRec: any) => {
@@ -648,6 +663,8 @@ const AgendaPage = () => {
           <p>Nenhum recebimento agendado</p>
         </div>
       )}
+
+      <FloatingAgendaChat />
     </div>
   );
 };
