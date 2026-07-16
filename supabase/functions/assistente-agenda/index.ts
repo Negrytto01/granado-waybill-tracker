@@ -7,6 +7,16 @@ const corsHeaders = {
 };
 
 const TZ = "America/Sao_Paulo";
+const STATUS_QUE_OCUPAM_AGENDA = [
+  "AGENDADO",
+  "CHEGOU",
+  "ACOPLADO",
+  "DESACOPLADO",
+  "EM DESCARGA",
+  "DESCARGA FINALIZADA",
+  "AGUARDANDO DESACOPLAGEM",
+  "AGUARDANDO ARMAZENAGEM",
+];
 
 // Horário de funcionamento da Doca 2 (recebimento) em minutos desde 00:00
 // dow: 0=Dom, 1=Seg ... 5=Sex, 6=Sáb
@@ -94,7 +104,7 @@ Deno.serve(async (req) => {
       .select("data_prevista, horario_agenda, quantidade_volumes, fornecedor, status")
       .gte("data_prevista", hoje)
       .lte("data_prevista", ate)
-      .not("status", "in", "(FINALIZADO,NAO_VEIO)")
+      .in("status", STATUS_QUE_OCUPAM_AGENDA)
       .not("horario_agenda", "is", null);
 
     if (error) throw error;
